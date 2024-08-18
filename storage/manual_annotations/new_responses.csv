@@ -1,0 +1,29 @@
+question,response,rating,edited_gt,sme_feedback,new_response,auto_evaluation
+Why can't I login?,Your might have forgotten your password. Please double check the error message to validate.,ACCEPT,nan,nan,"Sorry to hear that you're having trouble with your login. There can be multiple reasons why you're unable to access your account. You might have forgotten your login information, or perhaps the system may be experiencing temporary issues. 
+
+Please ensure that you're entering your username and password correctly, taking care to check for any potential typing errors or case sensitivity issues. If you've forgotten your login information, you can reset it through our automated system. Simply click on the ""Forgot Username/Password"" link on the login page and follow the prompts. 
+
+If after trying these steps you still cannot access your account, please contact our support team so we can verify your identity and help resolve the issue. Our team is available during our business hours which can be found at bank.com/hours. 
+
+Remember, as a security measure never share your login information with anyone else. If you suspect that your login information has been compromised, please inform us immediately.",REJECT
+How can I reset my online banking password?,"To reset your online banking password, simply click on the “Forgot Password” link on the login page, and follow the instructions. You will need to verify your identity using your registered phone number.",REJECT,nan,The response is partially correct but missing critical details. Users can verify their identity using either their registered email or phone number. Including both options provides complete information,"In order to reset your online banking password, you will need to navigate to our online banking portal. Click on 'Forgot Password' or 'Reset Password.' This will often require you to enter your username and additional identifying information like your social security number, date of birth, or account number. This is done to verify your identity and ensure the security of your account. 
+
+You'll then be guided through the process of creating a new password for your account. Please keep in mind that passwords should be unique, containing a mix of letters, numbers, and special characters to maintain high security. If you need further assistance, call our customer service line or visit a local branch. 
+
+Do note that working hours for our branches can be found at bank.com/hours. Always ensure you check this page to get the most accurate operational hours.",REJECT
+How can I contact customer service?,"You can reach our customer service team via phone at 1-800-123-4567, email at support@financialcompany.com, or through the live chat feature on our website.",ACCEPT,nan,nan,"You can contact our customer service team in several ways. Firstly, you can reach us by calling our toll-free hotline number that operates 24/7. Secondly, you can also email us at customerservice@ourbank.com. Alternatively, you can utilize the live chat feature on our website. For all questions related to your login information, please do ensure for security reasons not to mention them in emails or chats. If you need help outside of these channels, you may visit our branch during operation hours. Please check our website at bank.com/hours for up-to-date information on our branch hours. Please feel free to reach out if you have any further questions.",REJECT
+What investment options do you offer?,"We offer a variety of investment options including stocks, bonds, mutual funds, ETFs, and retirement accounts such as IRAs and 401(k) plans.",REJECT,nan,Not clear enough,"Thank you for your interest in our investment services. We offer a wide range of investment options to suit different financial goals and risk tolerance. 
+
+1. Mutual Funds: We offer various mutual funds options where you can benefit from diversification and professional management.
+
+2. Stocks: You can invest in a variety of stocks from different sectors, allowing you to potentially enjoy high returns, though there's also high risk involved.
+
+3. Bonds: Bonds are generally safer investments, where you lend money to an entity in exchange for periodic interest payments and the return of the bond's face value when it matures.
+
+4. Real Estate Investment Trusts: This enables you to invest in real estate without having to actually own any property yourself.
+
+5. Exchange Traded Funds (ETFs): These funds offer a mix of stocks, commodities, or bonds and they trade on an exchange like a stock. ETFs offer less risk than owning individual stocks, as they're diversified.
+
+6. Certificate of Deposits (CDs): CDs are time deposits with a specific fixed term and fixed interest rate. They are considered a safe investment and are an excellent option if you have a low-risk tolerance.
+
+Each of these investments carries different potential risks and rewards, and they may have eligibility criteria and specific documentary requirements. For detailed information on each of these investment options, and guidance on how to choose which is right for you, I suggest you speak with one of our investment advisors at your nearest branch. To know our operational hours, please visit bank.com/hours.",ACCEPT
