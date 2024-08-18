@@ -112,5 +112,5 @@ Your Response:
 Please generate a response to the user’s question utilizing the above FAQ and the general guidelines provided.
 
 User Question:
-{{user_question}}
+{user_question}
 """
