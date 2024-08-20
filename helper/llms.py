@@ -44,7 +44,7 @@ def query_gpt4(prompt, system_prompt="", model="gpt-4o", json_response=False):
         logger.info("GPT-4 Response: %s", response.choices[0].message.content)
         return response.choices[0].message.content
     except Exception as e:
-        logger.error("Error querying GPT-4: %s", str(e))
+        logger.error("Error querying GPT-4: \n%s", str(e))
         return f"Error: {str(e)}"
 
 
@@ -61,7 +61,9 @@ def query_structured_gpt4(prompt, system_prompt="", model="gpt-4o-2024-08-06"):
             temperature=0,
             response_format=AutoEvaluationResult,
         )
-        logger.info("Structured GPT-4 Response: %s", response.choices[0].message.parsed)
+        logger.info(
+            "Structured GPT-4 Response: \n%s", response.choices[0].message.parsed
+        )
         return response.choices[0].message.parsed
     except Exception as e:
         logger.error("Error querying structured GPT-4: %s", str(e))

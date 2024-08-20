@@ -6,10 +6,7 @@ import json
 import os
 from helper.logging import get_logger
 from openai import OpenAI
-from openai.types.chat import (
-    ChatCompletionSystemMessageParam,
-    ChatCompletionUserMessageParam,
-)
+
 from pydantic import BaseModel
 
 # Import custom modules
@@ -43,78 +40,6 @@ logging_level = st.selectbox(
     index=1,  # Default to INFO
 )
 logger.setLevel(logging_level)
-
-
-# # Define AutoEvaluationResult model
-# class AutoEvaluationResult(BaseModel):
-#     rationale: str
-#     result: str
-
-
-# # Function to query GPT-4 with structured output
-# @st.cache_data
-# def query_structured_gpt4(prompt, system_prompt="", model="gpt-4o-2024-08-06"):
-#     try:
-#         messages = [{"role": "user", "content": prompt}]
-#         if system_prompt:
-#             messages.insert(0, {"role": "system", "content": system_prompt})
-
-#         response = client.beta.chat.completions.parse(
-#             model=model,
-#             messages=messages,
-#             temperature=0,
-#             response_format=AutoEvaluationResult,
-#         )
-#         logger.info("Structured GPT-4 Response: %s", response.choices[0].message.parsed)
-#         return response.choices[0].message.parsed
-#     except Exception as e:
-#         logger.error(f"Error querying GPT-4: {str(e)}")
-#         return f"Error: {str(e)}"
-
-
-# # Function to query GPT-4 with optional JSON response
-# @st.cache_data
-# def query_gpt4(prompt, system_prompt="", model="gpt-4o", json_response=False):
-#     try:
-#         messages = [ChatCompletionUserMessageParam(role="user", content=prompt)]
-#         if system_prompt:
-#             messages.insert(
-#                 0,
-#                 ChatCompletionSystemMessageParam(role="system", content=system_prompt),
-#             )
-
-#         response_format = {"type": "json_object"} if json_response else None
-
-#         response = client.chat.completions.create(
-#             model=model,
-#             messages=messages,
-#             temperature=0,
-#             response_format=response_format,
-#         )
-#         logger.info("GPT-4 Response: %s", response.choices[0].message.content)
-#         return response.choices[0].message.content
-#     except Exception as e:
-#         logger.error(f"Error querying GPT-4: {str(e)}")
-#         return f"Error: {str(e)}"
-
-
-# # Function to parse auto-evaluation response
-# def parse_auto_evaluation_response(result):
-#     rational_parts = result.lower().split("rationale:")
-#     result_parts = result.lower().split("result:")
-
-#     parsed_rational = ""
-#     parsed_result = "UNKNOWN"
-
-#     if len(rational_parts) > 1:
-#         parsed_rational = rational_parts[1].strip()
-
-#     if len(result_parts) > 1:
-#         parsed_result = result_parts[1].strip().upper()
-#         if parsed_result not in ["ACCEPT", "REJECT"]:
-#             parsed_result = "UNKNOWN"
-
-#     return parsed_rational, parsed_result
 
 
 # Function to auto-evaluate responses
@@ -190,7 +115,7 @@ if "df" not in st.session_state:
         st.stop()
 
     st.session_state.df.drop(columns=["label", "feedback"], inplace=True)
-    st.session_state.df = st.session_state.df.sample(n=4, random_state=0).reset_index(
+    st.session_state.df = st.session_state.df.sample(n=15, random_state=0).reset_index(
         drop=True
     )
 
@@ -221,6 +146,11 @@ st.data_editor(
 st.subheader("Prompt Dev Box")
 st.write("Modify the baseline prompt based on the feedback and evaluated responses.")
 
+# Select a model
+model = st.selectbox(
+    "Select a model", ["gpt-4o", "gpt-4o-2024-08-06", "gpt-4-turbo-preview"]
+)
+
 try:
     with open("./storage/baseline_prompt.txt", "r") as f:
         baseline_prompt = f.read()
@@ -228,7 +158,21 @@ except FileNotFoundError:
     logger.warning("No baseline prompt found.")
     baseline_prompt = "No baseline prompt found. Please create one."
 
-modified_prompt = st.text_area("Modified Prompt", value=baseline_prompt, height=600)
+col1, col2 = st.columns([2, 1])
+
+# Prompt Development View
+with col1:
+    modified_prompt = st.text_area("Modified Prompt", value=baseline_prompt, height=600)
+
+# SME Feedback View
+with col2:
+    st.markdown("<b>SME Feedback</b>", unsafe_allow_html=True)
+    sme_feedback_container = st.container(height=600)
+    with sme_feedback_container:
+        for feedback in df["sme_feedback"]:
+            if feedback != "nan":
+                st.markdown(f"- {feedback}")
+
 
 if st.button("Preview Prompt"):
     new_responses = []
@@ -240,7 +184,7 @@ if st.button("Preview Prompt"):
         logger.info(f"Inference index {index}")
         question = row["question"]
         formated_prompt = modified_prompt.format(user_question=question)
-        response = query_gpt4(formated_prompt)
+        response = query_gpt4(formated_prompt, model=model)
         new_responses.append(response)
 
         logger.debug(f"Processed {index + 1} out of {total_rows}")

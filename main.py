@@ -12,8 +12,8 @@ st.set_page_config(
 st.markdown(apply_snorkel_style(), unsafe_allow_html=True)
 
 # Snorkel logo
-logo = Image.open("images/snorkel_logo.png")
-st.image(logo, width=200)
+logo = Image.open("images/snorkel-ai.png")
+st.image(logo, width=400)
 
 
 # Main header
