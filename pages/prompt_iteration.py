@@ -15,7 +15,8 @@ from prompts.auto_evaluation_prompts import (
     LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT,
     LLM_AS_A_JUDGE_SME_FEEDBACK_PROMPT,
 )
-from helper.llms import query_gpt4, query_structured_gpt4
+from prompts.base_prompts import PROMPT_1, PROMPT_2, PROMPT_3
+from helper.llms import query_gpt4, query_structured_gpt4, auto_evaluate_responses
 
 # Load environment variables
 load_dotenv()
@@ -42,64 +43,25 @@ logging_level = st.selectbox(
 logger.setLevel(logging_level)
 
 
-# Function to auto-evaluate responses
-def auto_evaluate_responses(df):
-    rational_list = []
-    auto_evaluation_results = []
-    progress_bar = st.progress(0)
-    progress_text = st.empty()
+# Create a state variable for button click
+if "sme_eval_button_clicked" not in st.session_state:
+    st.session_state.sme_eval_button_clicked = False
 
-    for index, row in df.iterrows():
-        progress = (index + 1) / len(df)
-        progress_bar.progress(progress)
-        progress_text.text(f"Auto Evaluation Progress: {int(progress * 100)}%")
-
-        logger.info(f"Auto Evaluation Question {index + 1}")
-        logger.debug(f"Question: {row['question']}")
-
-        if row["rating"] == "ACCEPT":
-            formated_prompt = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT.format(
-                old_response=row["response"], new_response=row["new_response"]
-            )
-        elif row["edited_gt"] != "nan":
-            formated_prompt = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT.format(
-                old_response=row["edited_gt"], new_response=row["new_response"]
-            )
-        elif row["sme_feedback"] != "nan":
-            formated_prompt = LLM_AS_A_JUDGE_SME_FEEDBACK_PROMPT.format(
-                old_response=row["response"],
-                sme_feedback=row["sme_feedback"],
-                new_response=row["new_response"],
-            )
-        else:
-            auto_evaluation_results.append("UNKNOWN")
-            rational_list.append("")
-            logger.warning("No edited ground truth or SME feedback available.")
-            logger.info("Auto Evaluation: N/A")
-            continue
-
-        auto_evaluate_response = query_structured_gpt4(formated_prompt)
-        logger.debug(f"LLM Response:\n{auto_evaluate_response}")
-
-        rational = auto_evaluate_response.rationale
-        auto_evaluation = auto_evaluate_response.result
-
-        rational_list.append(rational)
-        auto_evaluation_results.append(auto_evaluation)
-        logger.debug(f"Old Response:\n{row['response']}")
-        logger.debug(f"New Response:\n{row['new_response']}")
-        logger.info(f"Auto Evaluation: {auto_evaluation}")
-
-        logger.info("-----------------------------------")
-
-    progress_bar.empty()
-    progress_text.empty()
-
-    df["auto_evaluation"] = auto_evaluation_results
-    df["rational"] = rational_list
-
-    return df
-
+# Check if the button was clicked and perform the action
+if st.session_state.sme_eval_button_clicked:
+    print(st.session_state.auto_evaled_df)
+    print("HI2")
+    # Save the auto_evaled_df to a CSV file
+    try:
+        st.session_state.auto_evaled_df.to_csv(
+            "./storage/iteration_responses/new_responses2.csv", index=False
+        )
+        st.success("Responses saved for SME evaluation!")
+        # Reset the button state
+        st.session_state.sme_eval_button_clicked = False
+    except Exception as e:
+        st.error(f"Error saving responses: {str(e)}")
+        logger.error(f"Error saving responses: {str(e)}")
 
 # Load and prepare the dataframe
 if "df" not in st.session_state:
@@ -115,7 +77,7 @@ if "df" not in st.session_state:
         st.stop()
 
     st.session_state.df.drop(columns=["label", "feedback"], inplace=True)
-    st.session_state.df = st.session_state.df.sample(n=15, random_state=0).reset_index(
+    st.session_state.df = st.session_state.df.sample(n=4, random_state=0).reset_index(
         drop=True
     )
 
@@ -156,7 +118,7 @@ try:
         baseline_prompt = f.read()
 except FileNotFoundError:
     logger.warning("No baseline prompt found.")
-    baseline_prompt = "No baseline prompt found. Please create one."
+    baseline_prompt = PROMPT_1
 
 col1, col2 = st.columns([2, 1])
 
@@ -208,7 +170,7 @@ if st.button("Preview Prompt"):
             "new_response",
             "rating",
             "auto_evaluation",
-            "rational",
+            "rationale",
         ]
     ]
 
@@ -222,7 +184,7 @@ if st.button("Preview Prompt"):
             help="Green checkmark for ACCEPT, red X for REJECT",
             width="small",
         ),
-        "rational": st.column_config.TextColumn("Rational", width="large"),
+        "rationale": st.column_config.TextColumn("Rationale", width="large"),
     }
 
     display_df["auto_evaluation"] = display_df["auto_evaluation"].apply(
@@ -240,9 +202,44 @@ if st.button("Preview Prompt"):
             "new_response",
             "rating",
             "auto_evaluation",
-            "rational",
+            "rationale",
         ],
     )
+    st.session_state.auto_evaled_df = auto_evaled_df
+    print("HI")
+
+    # # Add a button to send for SME evaluation
+    # if st.button("Send for SME Evaluation"):
+    #     st.session_state.auto_evaled_df = auto_evaled_df
+    #     st.session_state.sme_eval_button_clicked = True
+    #     st.rerun()
+
+# Check if the button was clicked and perform the action
+if st.button("Send for SME Evaluation"):
+    if st.session_state.auto_evaled_df is not None:
+        # Rename columns
+        df_to_save = st.session_state.auto_evaled_df.rename(
+            columns={
+                "response": "old_response",
+                "new_response": "response",
+                "rating": "old_rating",
+            }
+        )
+        # Save the modified dataframe to a CSV file
+        try:
+            df_to_save.to_csv(
+                "./storage/iteration_responses/new_responses.csv", index=False
+            )
+            st.success("Responses saved for SME evaluation!")
+            # Reset the button state
+            st.session_state.sme_eval_button_clicked = False
+        except Exception as e:
+            st.error(f"Error saving responses: {str(e)}")
+            logger.error(f"Error saving responses: {str(e)}")
+    else:
+        st.error(
+            "No responses to send for SME evaluation. Need to preview prompt first."
+        )
 
 # # Save the updated dataframe
 # df.to_csv("./storage/manual_annotations/new_responses.csv", index=False)

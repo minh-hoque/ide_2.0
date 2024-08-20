@@ -8,6 +8,10 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 from helper.logging import get_logger
+from prompts.auto_evaluation_prompts import (
+    LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT,
+    LLM_AS_A_JUDGE_SME_FEEDBACK_PROMPT,
+)
 
 # Load environment variables and set up OpenAI client
 load_dotenv()
@@ -17,7 +21,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 logger = get_logger(__name__)
 
 
-# Data models
+# Data Class for Auto Evaluation Result from LLM
 class AutoEvaluationResult(BaseModel):
     rationale: str
     result: str
@@ -84,3 +88,62 @@ def parse_auto_evaluation_response(result):
             parsed_result = "UNKNOWN"
 
     return parsed_rational, parsed_result
+
+
+# Function to auto-evaluate responses
+def auto_evaluate_responses(df):
+    rational_list = []
+    auto_evaluation_results = []
+    progress_bar = st.progress(0)
+    progress_text = st.empty()
+
+    for index, row in df.iterrows():
+        progress = (index + 1) / len(df)
+        progress_bar.progress(progress)
+        progress_text.text(f"Auto Evaluation Progress: {int(progress * 100)}%")
+
+        logger.info(f"Auto Evaluation Question {index + 1}")
+        logger.debug(f"Question: {row['question']}")
+
+        if row["rating"] == "ACCEPT":
+            formated_prompt = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT.format(
+                old_response=row["response"], new_response=row["new_response"]
+            )
+        elif row["edited_gt"] != "nan":
+            formated_prompt = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT.format(
+                old_response=row["edited_gt"], new_response=row["new_response"]
+            )
+        elif row["sme_feedback"] != "nan":
+            formated_prompt = LLM_AS_A_JUDGE_SME_FEEDBACK_PROMPT.format(
+                old_response=row["response"],
+                sme_feedback=row["sme_feedback"],
+                new_response=row["new_response"],
+            )
+        else:
+            auto_evaluation_results.append("UNKNOWN")
+            rational_list.append("")
+            logger.warning("No edited ground truth or SME feedback available.")
+            logger.info("Auto Evaluation: N/A")
+            continue
+
+        auto_evaluate_response = query_structured_gpt4(formated_prompt)
+        logger.debug(f"LLM Response:\n{auto_evaluate_response}")
+
+        rational = auto_evaluate_response.rationale
+        auto_evaluation = auto_evaluate_response.result
+
+        rational_list.append(rational)
+        auto_evaluation_results.append(auto_evaluation)
+        logger.debug(f"Old Response:\n{row['response']}")
+        logger.debug(f"New Response:\n{row['new_response']}")
+        logger.info(f"Auto Evaluation: {auto_evaluation}")
+
+        logger.info("-----------------------------------")
+
+    progress_bar.empty()
+    progress_text.empty()
+
+    df["auto_evaluation"] = auto_evaluation_results
+    df["rationale"] = rational_list
+
+    return df
