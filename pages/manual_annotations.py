@@ -1,8 +1,12 @@
 import streamlit as st
 import pandas as pd
 from css.style import apply_snorkel_style
+from helper.logging import get_logger
 
 # Helper functions
+
+# Get a logger for this module
+logger = get_logger(__name__)
 
 
 def setup_page():
@@ -64,7 +68,7 @@ def update_dataframe(df, index, rating, edited_gt, sme_feedback):
 def save_annotations(df):
     """Save the annotations to a CSV file."""
     if st.button("Submit Annotations"):
-        df.to_csv("./storage/manual_annotations/evaluated_responses.csv", index=False)
+        df.to_csv("./storage/manual_annotations/evaluated_responses_2.csv", index=False)
         st.success("Annotations submitted successfully!")
 
 
