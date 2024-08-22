@@ -9,7 +9,7 @@ from openai import OpenAI
 from css.style import apply_snorkel_style
 from helper.llms import query_gpt4, auto_evaluate_responses
 from helper.logging import get_logger
-from prompts.base_prompts import PROMPT_1
+from prompts.base_prompts import PROMPT_1, PROMPT_4
 
 # Load environment variables and set up OpenAI client
 load_dotenv()
@@ -89,7 +89,7 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         "old_rating",
     ]
     df = df.drop(columns=columns_to_drop, errors="ignore")
-    df = df.sample(n=4, random_state=0).reset_index(drop=True)
+    # df = df.sample(n=4, random_state=0).reset_index(drop=True)
     df["edited_gt"] = df["edited_gt"].astype(str)
     df["sme_feedback"] = df["sme_feedback"].astype(str)
     return df
@@ -121,7 +121,7 @@ def load_baseline_prompt() -> str:
             return f.read()
     except FileNotFoundError:
         logger.warning("No baseline prompt found. Using default prompt.")
-        return PROMPT_1
+        return PROMPT_4
 
 
 def display_prompt_dev_box(baseline_prompt: str, df: pd.DataFrame) -> Tuple[str, str]:
@@ -151,6 +151,63 @@ def display_prompt_dev_box(baseline_prompt: str, df: pd.DataFrame) -> Tuple[str,
     return modified_prompt, model
 
 
+def calculate_metrics(auto_evaled_df: pd.DataFrame) -> dict:
+    """Calculate metrics for the auto-evaluated responses."""
+    total_responses = len(auto_evaled_df)
+    accepted_responses = (auto_evaled_df["auto_evaluation"] == "ACCEPT").sum()
+    accept_percentage = (accepted_responses / total_responses) * 100
+
+    total_previous_accept = (auto_evaled_df["rating"] == "ACCEPT").sum()
+    regressions = (
+        (auto_evaled_df["rating"] == "ACCEPT")
+        & (auto_evaled_df["auto_evaluation"] == "REJECT")
+    ).sum()
+    regression_percentage = (
+        (regressions / total_previous_accept * 100) if total_previous_accept > 0 else 0
+    )
+
+    total_previous_reject = (auto_evaled_df["rating"] == "REJECT").sum()
+    improvements = (
+        (auto_evaled_df["rating"] == "REJECT")
+        & (auto_evaled_df["auto_evaluation"] == "ACCEPT")
+        & (auto_evaled_df["sme_feedback"] != "nan")
+    ).sum()
+    improvement_percentage = (
+        (improvements / total_previous_reject * 100) if total_previous_reject > 0 else 0
+    )
+
+    return {
+        "accept_percentage": accept_percentage,
+        "regression_percentage": regression_percentage,
+        "improvement_percentage": improvement_percentage,
+    }
+
+
+def display_metrics(metrics: dict):
+    """Display the calculated metrics with tooltips for descriptions."""
+    st.subheader("Evaluation Metrics")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric(
+            label="Accepted Responses",
+            value=f"{metrics['accept_percentage']:.2f}%",
+            help="Percentage of total responses that were accepted in this iteration.",
+        )
+    with col2:
+        st.metric(
+            label="Regressions",
+            value=f"{metrics['regression_percentage']:.2f}%",
+            help="Percentage of responses that were previously ACCEPT but now REJECT, out of all previously accepted responses.",
+        )
+    with col3:
+        st.metric(
+            label="Improvements",
+            value=f"{metrics['improvement_percentage']:.2f}%",
+            help="Percentage of responses that were previously REJECT with SME feedback and are now ACCEPT, out of all previously rejected responses.",
+        )
+
+
 def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str):
     """Preview the modified prompt and generate new responses."""
     if st.button("Preview Prompt"):
@@ -158,6 +215,10 @@ def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str):
         auto_eval_df = df.copy()
         auto_eval_df["new_response"] = new_responses
         auto_evaled_df = auto_evaluate_responses(auto_eval_df)
+
+        metrics = calculate_metrics(auto_evaled_df)
+        display_metrics(metrics)
+
         display_preview_results(auto_evaled_df)
         st.session_state.auto_evaled_df = auto_evaled_df
 
