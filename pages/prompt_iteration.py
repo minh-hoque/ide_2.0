@@ -1,15 +1,15 @@
-# Import necessary libraries
-from dotenv import load_dotenv
-import streamlit as st
-import pandas as pd
 import os
-from helper.logging import get_logger
+from typing import Tuple
+
+import pandas as pd
+import streamlit as st
+from dotenv import load_dotenv
 from openai import OpenAI
 
-# Import custom modules
 from css.style import apply_snorkel_style
-from prompts.base_prompts import PROMPT_1
 from helper.llms import query_gpt4, auto_evaluate_responses
+from helper.logging import get_logger
+from prompts.base_prompts import PROMPT_1
 
 # Load environment variables and set up OpenAI client
 load_dotenv()
@@ -35,37 +35,67 @@ def setup_logging():
     logging_level = st.selectbox(
         "Select Logging Level",
         ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
-        index=1,  # Default to INFO
+        index=1,
     )
     logger.setLevel(logging_level)
 
 
-def load_data():
+def load_data() -> pd.DataFrame:
     """Load and prepare the dataframe."""
-    if "df" not in st.session_state:
+    eval_files = [
+        f
+        for f in os.listdir("./storage/manual_annotations")
+        if f.startswith("evaluated_responses") and f.endswith(".csv")
+    ]
+
+    if not eval_files:
+        st.error(
+            "No evaluated responses found. Please complete manual annotations first."
+        )
+        st.stop()
+
+    selected_file = st.selectbox("Select evaluated responses file:", ["-"] + eval_files)
+
+    if selected_file == "-":
+        st.error("No file selected. Please try again.")
+        st.stop()
+
+    if "df" not in st.session_state or selected_file != st.session_state.get(
+        "selected_file"
+    ):
         try:
-            st.session_state.df = pd.read_csv(
-                "./storage/manual_annotations/evaluated_responses.csv"
+            df = pd.read_csv(
+                os.path.join("./storage/manual_annotations", selected_file)
             )
+            df = preprocess_dataframe(df)
+            st.session_state.df = df
+            st.session_state.selected_file = selected_file
         except FileNotFoundError:
-            logger.error("No evaluated responses found.")
-            st.error(
-                "No evaluated responses found. Please complete manual annotations first."
-            )
+            logger.error(f"Selected file {selected_file} not found.")
+            st.error(f"Selected file {selected_file} not found. Please try again.")
             st.stop()
 
-        st.session_state.df.drop(columns=["label", "feedback"], inplace=True)
-        st.session_state.df = st.session_state.df.sample(
-            n=4, random_state=0
-        ).reset_index(drop=True)
+    return st.session_state.df
 
-    df = st.session_state.df
+
+def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Preprocess the loaded dataframe."""
+    columns_to_drop = [
+        "label",
+        "feedback",
+        "rationale",
+        "auto_evaluation",
+        "old_response",
+        "old_rating",
+    ]
+    df = df.drop(columns=columns_to_drop, errors="ignore")
+    df = df.sample(n=4, random_state=0).reset_index(drop=True)
     df["edited_gt"] = df["edited_gt"].astype(str)
     df["sme_feedback"] = df["sme_feedback"].astype(str)
     return df
 
 
-def display_evaluated_responses(df):
+def display_evaluated_responses(df: pd.DataFrame):
     """Display the evaluated responses in a data editor."""
     st.subheader("Evaluated Responses")
     column_config = {
@@ -84,17 +114,17 @@ def display_evaluated_responses(df):
     )
 
 
-def load_baseline_prompt():
+def load_baseline_prompt() -> str:
     """Load the baseline prompt from file or use default."""
     try:
         with open("./storage/baseline_prompt.txt", "r") as f:
             return f.read()
     except FileNotFoundError:
-        logger.warning("No baseline prompt found.")
+        logger.warning("No baseline prompt found. Using default prompt.")
         return PROMPT_1
 
 
-def display_prompt_dev_box(baseline_prompt, df):
+def display_prompt_dev_box(baseline_prompt: str, df: pd.DataFrame) -> Tuple[str, str]:
     """Display the prompt development box for development."""
     st.subheader("Prompt Dev Box")
     st.write(
@@ -121,37 +151,41 @@ def display_prompt_dev_box(baseline_prompt, df):
     return modified_prompt, model
 
 
-def preview_prompt(df, modified_prompt, model):
+def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str):
     """Preview the modified prompt and generate new responses."""
     if st.button("Preview Prompt"):
-        new_responses = []
-        progress_bar = st.progress(0)
-        progress_text = st.empty()
-        total_rows = len(df)
-
-        for index, row in df.iterrows():
-            logger.info(f"Inference index {index}")
-            question = row["question"]
-            formatted_prompt = modified_prompt.format(user_question=question)
-            response = query_gpt4(formatted_prompt, model=model)
-            new_responses.append(response)
-
-            progress = float(index + 1) / float(total_rows)
-            progress_bar.progress(progress)
-            progress_text.text(f"Generating new responses: {index + 1}/{total_rows}")
-
-        progress_bar.empty()
-        progress_text.empty()
-
+        new_responses = generate_new_responses(df, modified_prompt, model)
         auto_eval_df = df.copy()
         auto_eval_df["new_response"] = new_responses
         auto_evaled_df = auto_evaluate_responses(auto_eval_df)
-
         display_preview_results(auto_evaled_df)
         st.session_state.auto_evaled_df = auto_evaled_df
 
 
-def display_preview_results(auto_evaled_df):
+def generate_new_responses(df: pd.DataFrame, modified_prompt: str, model: str) -> list:
+    """Generate new responses using the modified prompt."""
+    new_responses = []
+    progress_bar = st.progress(0)
+    progress_text = st.empty()
+    total_rows = len(df)
+
+    for index, row in df.iterrows():
+        logger.info(f"Inference index {index}")
+        question = row["question"]
+        formatted_prompt = modified_prompt.format(user_question=question)
+        response = query_gpt4(formatted_prompt, model=model)
+        new_responses.append(response)
+
+        progress = float(index + 1) / float(total_rows)
+        progress_bar.progress(progress)
+        progress_text.text(f"Generating new responses: {index + 1}/{total_rows}")
+
+    progress_bar.empty()
+    progress_text.empty()
+    return new_responses
+
+
+def display_preview_results(auto_evaled_df: pd.DataFrame):
     """Display the results of the preview."""
     st.write("Responses generated with the modified prompt:")
     display_df = auto_evaled_df[
@@ -201,7 +235,7 @@ def display_preview_results(auto_evaled_df):
 def send_for_sme_evaluation():
     """Send the generated responses for SME evaluation."""
     if st.button("Send for SME Evaluation"):
-        if st.session_state.auto_evaled_df is not None:
+        if "auto_evaled_df" in st.session_state:
             df_to_save = st.session_state.auto_evaled_df.rename(
                 columns={
                     "response": "old_response",
