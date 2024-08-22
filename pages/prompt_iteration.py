@@ -342,7 +342,8 @@ def send_for_sme_evaluation():
             )
             try:
                 df_to_save.to_csv(
-                    "./storage/iteration_responses/new_responses.csv", index=False
+                    "./storage/iteration_responses/new_experiment_responses.csv",
+                    index=False,
                 )
                 st.success("Responses saved for SME evaluation!")
             except Exception as e:
