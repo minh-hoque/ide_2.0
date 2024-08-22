@@ -41,7 +41,7 @@ def display_question_and_response(
         st.write(f"**Response:** {response_text}")
 
 
-def get_user_feedback(index: int, rating: str):
+def get_user_feedback(index: int, rating: str, old_feedback: str = ""):
     """Collect user feedback for rejected responses."""
     if rating == "ACCEPT":
         return "", ""
@@ -50,8 +50,15 @@ def get_user_feedback(index: int, rating: str):
         "Provide the correct ground truth response (optional):",
         key=f"ground_truth_{index}",
     )
+
+    # # Display old feedback if it exists
+    # if old_feedback:
+    #     st.write("Previous feedback:")
+    #     st.info(old_feedback)
+
     sme_feedback = st.text_area(
         "Provide feedback for the data scientist:",
+        value=old_feedback,  # Pre-fill with old feedback
         key=f"feedback_{index}",
         placeholder="Enter your feedback here...",
     )
@@ -90,7 +97,8 @@ def display_and_rate_response(
         index=default_index,
     )
 
-    edited_gt, sme_feedback = get_user_feedback(index, rating)
+    old_feedback = row.get("sme_feedback", "")
+    edited_gt, sme_feedback = get_user_feedback(index, rating, old_feedback)
     df = update_annotation(df, index, rating, edited_gt, sme_feedback)
 
 
@@ -106,8 +114,12 @@ def process_annotations(uploaded_file):
         return
 
     is_iteration = "rationale" in df.columns and "auto_evaluation" in df.columns
+    has_old_feedback = "sme_feedback" in df.columns
+
     if is_iteration:
         st.write("Displaying responses after prompt iteration")
+    if has_old_feedback:
+        st.write("Previous SME feedback is available for editing")
 
     highlight_rejects = st.checkbox("Highlight REJECT responses")
 
