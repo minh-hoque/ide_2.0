@@ -180,32 +180,68 @@ def calculate_metrics(auto_evaled_df: pd.DataFrame) -> dict:
         "accept_percentage": accept_percentage,
         "regression_percentage": regression_percentage,
         "improvement_percentage": improvement_percentage,
+        "accepted_responses": accepted_responses,
+        "total_responses": total_responses,
+        "regressions": regressions,
+        "improvements": improvements,
     }
 
 
-def display_metrics(metrics: dict):
-    """Display the calculated metrics with tooltips for descriptions."""
+def display_metrics(current_metrics: dict):
+    """Display the calculated metrics with tooltips for descriptions and deltas."""
     st.subheader("Evaluation Metrics")
     col1, col2, col3 = st.columns(3)
 
+    previous_metrics = st.session_state.get("previous_metrics", {})
+
+    def get_delta(current, previous, key):
+        if previous and key in previous:
+            delta = current[key] - previous[key]
+            delta_str = f"{delta:+.2f}%"
+            delta_color = "green" if delta > 0 else "red"
+            return delta_str, delta_color
+        return None, None
+
     with col1:
+        delta, color = get_delta(current_metrics, previous_metrics, "accept_percentage")
         st.metric(
             label="Accepted Responses",
-            value=f"{metrics['accept_percentage']:.2f}%",
-            help="Percentage of total responses that were accepted in this iteration.",
+            value=f"{current_metrics['accept_percentage']:.2f}%",
+            delta=delta,
+            # delta_color=color,
+            help=f"Percentage of total responses that were accepted in this iteration. ({current_metrics['accepted_responses']} / {current_metrics['total_responses']})",
         )
+
     with col2:
+        delta, color = get_delta(
+            current_metrics, previous_metrics, "regression_percentage"
+        )
+        if delta:
+            color = (
+                "red" if color == "green" else "green"
+            )  # Invert color for regressions
         st.metric(
             label="Regressions",
-            value=f"{metrics['regression_percentage']:.2f}%",
-            help="Percentage of responses that were previously ACCEPT but now REJECT, out of all previously accepted responses.",
+            value=f"{current_metrics['regression_percentage']:.2f}%",
+            delta=delta,
+            # delta_color=color,
+            help=f"Percentage of responses that were previously ACCEPT but now REJECT, out of all previously accepted responses. ({current_metrics['regressions']} regressions)",
         )
+
     with col3:
+        delta, color = get_delta(
+            current_metrics, previous_metrics, "improvement_percentage"
+        )
         st.metric(
             label="Improvements",
-            value=f"{metrics['improvement_percentage']:.2f}%",
-            help="Percentage of responses that were previously REJECT with SME feedback and are now ACCEPT, out of all previously rejected responses.",
+            value=f"{current_metrics['improvement_percentage']:.2f}%",
+            delta=delta,
+            # delta_color=color,
+            help=f"Percentage of responses that were previously REJECT with SME feedback and are now ACCEPT, out of all previously rejected responses. ({current_metrics['improvements']} improvements)",
         )
+
+    # Store current metrics for next comparison
+    st.session_state.previous_metrics = current_metrics
 
 
 def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str):
