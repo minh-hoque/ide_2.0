@@ -25,9 +25,12 @@ def display_question_and_response(
 
     if is_iteration:
         auto_eval_icon = "✅" if row.get("auto_evaluation") == "ACCEPT" else "❌"
+        rationale = row.get("rationale", "")
+        rationale = "" if pd.isna(rationale) else rationale
+
         st.markdown(
             f"##### **Question {question_number}**: {question_text} ➪ Auto Evaluation: {auto_eval_icon}",
-            help=row.get("rationale", ""),
+            help=rationale,
         )
         col1, col2 = st.columns(2)
         with col1:
@@ -51,14 +54,9 @@ def get_user_feedback(index: int, rating: str, old_feedback: str = ""):
         key=f"ground_truth_{index}",
     )
 
-    # # Display old feedback if it exists
-    # if old_feedback:
-    #     st.write("Previous feedback:")
-    #     st.info(old_feedback)
-
     sme_feedback = st.text_area(
         "Provide feedback for the data scientist:",
-        value=old_feedback,  # Pre-fill with old feedback
+        value=old_feedback if old_feedback != "" else "",
         key=f"feedback_{index}",
         placeholder="Enter your feedback here...",
     )
@@ -70,8 +68,8 @@ def update_annotation(
 ):
     """Update the dataframe with user annotations."""
     df.loc[index, "rating"] = rating
-    df.loc[index, "sme_feedback"] = sme_feedback
-    df.loc[index, "edited_gt"] = edited_gt
+    df.loc[index, "sme_feedback"] = sme_feedback if sme_feedback != "" else ""
+    df.loc[index, "edited_gt"] = edited_gt if edited_gt != "" else ""
     return df
 
 
@@ -104,7 +102,7 @@ def display_and_rate_response(
 
 def process_annotations(uploaded_file):
     """Process the uploaded CSV file and handle annotations."""
-    df = pd.read_csv(uploaded_file)
+    df = pd.read_csv(uploaded_file, na_values=["", "nan", "NaN", "None"])
     required_columns = ["question", "response"]
 
     if not set(required_columns).issubset(df.columns):
@@ -117,9 +115,7 @@ def process_annotations(uploaded_file):
     has_old_feedback = "sme_feedback" in df.columns
 
     if is_iteration:
-        st.write("Displaying responses after prompt iteration")
-    if has_old_feedback:
-        st.write("Previous SME feedback is available for editing")
+        st.markdown("#### Displaying responses after prompt iteration")
 
     highlight_rejects = st.checkbox("Highlight REJECT responses")
 
@@ -135,6 +131,14 @@ def process_annotations(uploaded_file):
         st.markdown("<hr>", unsafe_allow_html=True)
 
     save_annotations(df)
+
+
+def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Preprocess the loaded dataframe."""
+    # Convert 'edited_gt' and 'sme_feedback' to string, replacing NaN with empty string
+    df["edited_gt"] = df["edited_gt"].fillna("").astype(str)
+    df["sme_feedback"] = df["sme_feedback"].fillna("").astype(str)
+    return df
 
 
 def main():

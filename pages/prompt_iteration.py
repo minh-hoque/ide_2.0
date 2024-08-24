@@ -10,6 +10,7 @@ from css.style import apply_snorkel_style
 from helper.llms import query_gpt4, auto_evaluate_responses
 from helper.logging import get_logger
 from prompts.base_prompts import PROMPT_1, PROMPT_4
+import pandas as pd
 
 # Load environment variables and set up OpenAI client
 load_dotenv()
@@ -65,7 +66,14 @@ def load_data() -> pd.DataFrame:
     ):
         try:
             df = pd.read_csv(
-                os.path.join("./storage/manual_annotations", selected_file)
+                os.path.join("./storage/manual_annotations", selected_file),
+                na_values=[
+                    "",
+                    "nan",
+                    "NaN",
+                    "None",
+                ],  # Specify values to be treated as NaN
+                keep_default_na=True,
             )
             df = preprocess_dataframe(df)
             st.session_state.df = df
@@ -89,9 +97,11 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         "old_rating",
     ]
     df = df.drop(columns=columns_to_drop, errors="ignore")
-    # df = df.sample(n=4, random_state=0).reset_index(drop=True)
-    df["edited_gt"] = df["edited_gt"].astype(str)
-    df["sme_feedback"] = df["sme_feedback"].astype(str)
+
+    # Convert 'edited_gt' and 'sme_feedback' to string, replacing NaN with empty string
+    df["edited_gt"] = df["edited_gt"].fillna("").astype(str)
+    df["sme_feedback"] = df["sme_feedback"].fillna("").astype(str)
+
     return df
 
 
@@ -145,7 +155,7 @@ def display_prompt_dev_box(baseline_prompt: str, df: pd.DataFrame) -> Tuple[str,
         sme_feedback_container = st.container(height=600)
         with sme_feedback_container:
             for feedback in df["sme_feedback"]:
-                if feedback != "nan":
+                if feedback != "":
                     st.markdown(f"- {feedback}")
 
     return modified_prompt, model
@@ -170,7 +180,7 @@ def calculate_metrics(auto_evaled_df: pd.DataFrame) -> dict:
     improvements = (
         (auto_evaled_df["rating"] == "REJECT")
         & (auto_evaled_df["auto_evaluation"] == "ACCEPT")
-        & (auto_evaled_df["sme_feedback"] != "nan")
+        & (auto_evaled_df["sme_feedback"] != "")
     ).sum()
     improvement_percentage = (
         (improvements / total_previous_reject * 100) if total_previous_reject > 0 else 0

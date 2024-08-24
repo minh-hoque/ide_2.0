@@ -12,6 +12,7 @@ from prompts.auto_evaluation_prompts import (
     LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT,
     LLM_AS_A_JUDGE_SME_FEEDBACK_PROMPT,
 )
+import pandas as pd
 
 # Load environment variables and set up OpenAI client
 load_dotenv()
@@ -109,11 +110,11 @@ def auto_evaluate_responses(df):
             formated_prompt = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT.format(
                 old_response=row["response"], new_response=row["new_response"]
             )
-        elif row["edited_gt"] != "nan":
+        elif row["edited_gt"] != "":
             formated_prompt = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT.format(
                 old_response=row["edited_gt"], new_response=row["new_response"]
             )
-        elif row["sme_feedback"] != "nan":
+        elif row["sme_feedback"] != "":
             formated_prompt = LLM_AS_A_JUDGE_SME_FEEDBACK_PROMPT.format(
                 old_response=row["response"],
                 sme_feedback=row["sme_feedback"],
