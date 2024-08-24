@@ -1,0 +1,215 @@
+question,old_response,old_rating,sme_feedback,edited_gt,response,auto_evaluation,rationale
+What are the current interest rates for your savings accounts?,"The current interest rate for our standard savings account is 1.25% APY. For the most accurate and up-to-date rates, please visit our website or contact a representative at your nearest branch.",REJECT,"Overall correct response, however it should provide an actual link to our website",nan,"Thank you for reaching out to FutureBank! Our current interest rate for savings accounts is 1.25% APY. Here are some additional details about our savings accounts:
+
+1. **Interest Rate**: 1.25% APY
+2. **Minimum Opening Deposit**: $25
+3. **Monthly Maintenance Fees**: No monthly maintenance fees if the balance is above $300
+
+If you have any more questions or need further assistance, please feel free to contact us at 1-800-123-4567 or email us at support@futurebank.com. You can also visit our website for more information: [www.futurebank.com](www.futurebank.com).
+
+Thank you for choosing FutureBank!",ACCEPT,"The new response has effectively incorporated the SME feedback by providing a direct link to the website, which was the primary suggestion from the SME. This addition ensures that users have easy access to the most accurate and up-to-date rates, as initially recommended. Furthermore, the new response enhances the original by including additional details about the savings account, such as the minimum opening deposit and the absence of monthly maintenance fees, which adds value and context for the user. All aspects of the SME feedback have been addressed, and the response remains relevant and accurate within the context of the original query."
+How do I apply for a personal loan through FutureBank?,"You can apply for a personal loan online through our website, by visiting any of our branches, or by calling our customer service hotline at 1-800-123-4567. The application process is quick and straightforward, and you’ll need to provide your personal information, employment details, and financial history.",ACCEPT,nan,nan,"Thank you for reaching out to FutureBank! Applying for a personal loan with us is a straightforward process. You can apply either online or in-person. Here are the steps for both methods:
+
+### Online Application:
+1. **Visit our Website**: Go to [www.futurebank.com](http://www.futurebank.com).
+2. **Navigate to Loans Section**: Click on the ""Loans"" tab and select ""Personal Loans.""
+3. **Start Application**: Click on the ""Apply Now"" button.
+4. **Fill Out the Form**: Complete the online application form with your personal and financial information.
+5. **Submit**: Review your information and submit the application.
+6. **Approval Process**: Our team will review your application and get back to you with a decision, usually within a few business days.
+
+### In-Person Application:
+1. **Visit a Branch**: Go to any of our over 200 branches nationwide. You can find the nearest branch on our website.
+2. **Bring Required Documents**: Make sure to bring a valid ID, proof of address, and any other necessary financial documents.
+3. **Speak with a Representative**: A bank representative will assist you in filling out the application form.
+4. **Submit Application**: Submit your completed application to the representative.
+5. **Approval Process**: Our team will review your application and notify you of the decision.
+
+If you have any further questions or need assistance, feel free to contact our 24/7 Customer Service Hotline at 1-800-123-4567 or email us at support@futurebank.com.
+
+For more information, please visit our website: [www.futurebank.com](http://www.futurebank.com).
+
+Thank you for choosing FutureBank!",ACCEPT,"The new response provides a more detailed and structured approach to applying for a personal loan compared to the old response. It breaks down the application process into clear steps for both online and in-person methods, enhancing the granularity and clarity of the information provided. Additionally, it includes contact information and a friendly tone, which improves the overall quality and relevance by addressing potential customer queries and offering support options. The new response not only matches but exceeds the old response in terms of quality, granularity, and relevance, making it a more comprehensive and user-friendly guide for potential applicants."
+What steps should I take if I suspect fraudulent activity on my account?,"If you suspect fraudulent activity on your account, please contact our 24/7 customer service hotline immediately at 1-800-123-4567. We will help secure your account, investigate the issue, and guide you through the next steps to protect your finances.",REJECT,It should also mention that the customer can send an email to our fraud team email,nan,"Dear Customer,
+
+If you suspect fraudulent activity on your account, please follow these steps to ensure your account's security:
+
+1. **Contact Us Immediately**: Call our 24/7 Customer Service Hotline at 1-800-123-4567 to report the suspicious activity. Our team will assist you in securing your account and investigating the issue.
+
+2. **Email Our Fraud Team**: Send an email detailing the suspicious activity to our dedicated fraud team at future_bank_fraud@gmail.com. Include any relevant information such as transaction details and dates.
+
+3. **Monitor Your Account**: Regularly check your account for any unauthorized transactions. You can do this through our online banking portal at [www.futurebank.com/online-banking](www.futurebank.com/online-banking) or via our mobile app available on iOS and Android.
+
+4. **Enable Fraud Alerts**: Ensure that fraud alerts are activated on your account. These real-time notifications will help you stay informed about any suspicious activities.
+
+5. **Change Your Passwords**: Update your online banking password and any other related passwords to enhance security. You can reset your password by clicking on the “Forgot Password” link on the login page and following the prompts.
+
+6. **Review Security Settings**: Verify that Multi-Factor Authentication (MFA) is enabled for your online and mobile banking accounts. This adds an extra layer of security to your account.
+
+For more information on our security features and how we protect your data, please visit our website at [www.futurebank.com](www.futurebank.com).
+
+If you have any further questions or need additional assistance, please do not hesitate to contact us.
+
+Best regards,
+FutureBank Customer Service
+",ACCEPT,"The new response has effectively incorporated the SME feedback by including the option for customers to email the fraud team at the specified email address. This addition addresses the SME's suggestion and enhances the completeness of the response by providing an alternative method of communication. Furthermore, the new response maintains relevance by integrating the email option within a comprehensive list of steps to secure the account, ensuring that the information is contextually appropriate and useful for the customer. The response is now more accurate, complete, and relevant, fully reflecting the SME's feedback."
+Are there any fees associated with using ATMs outside of FutureBank's network?,"Yes, using ATMs outside of FutureBank’s network may incur fees. The fee varies depending on the ATM used and your specific account type. Please refer to your account’s terms and conditions or contact us for more detailed information.",ACCEPT,nan,nan,"Thank you for reaching out with your question about ATM fees. FutureBank provides access to over 30,000 ATMs nationwide, and using these ATMs is free of charge. However, if you use an ATM outside of FutureBank's network, there may be fees associated with those transactions. Here are the steps to avoid these fees:
+
+1. **Locate a FutureBank ATM**: Use our website or mobile app to find the nearest FutureBank ATM. This will help you avoid any additional fees.
+2. **Check for Network ATMs**: FutureBank is part of several ATM networks. Ensure the ATM you are using is part of these networks to avoid fees.
+3. **Review Your Account Terms**: Some accounts may offer reimbursement for a certain number of out-of-network ATM fees. Check your account details for more information.
+
+For more details, please visit our website at [www.futurebank.com](www.futurebank.com) or contact our 24/7 customer service hotline at 1-800-123-4567.
+
+If you have any other questions or need further assistance, feel free to reach out!
+
+Best regards,
+[Your Name]
+FutureBank Customer Service Representative",ACCEPT,"The new response provides a more comprehensive and customer-friendly approach compared to the old response. It not only addresses the potential fees associated with using ATMs outside of FutureBank's network but also offers practical steps to avoid these fees, enhancing the granularity of the information provided. Additionally, it includes contact information and a personal touch, which improves the quality and relevance of the response by making it more engaging and helpful to the customer. The new response exceeds the old response in terms of detail and customer service orientation, making it superior in all evaluated criteria."
+Can I set up automatic bill payments through your online banking platform?,"Yes, you can set up automatic bill payments through our online banking platform. Simply log in to your account, go to the bill payment section, and follow the prompts to set up automatic payments for your recurring bills.",REJECT,"Whenever providing steps, make sure the response is a numbered list.",nan,"Dear User,
+
+Thank you for reaching out to FutureBank. Yes, you can set up automatic bill payments through our online banking platform. Here are the steps to do so:
+
+1. **Log in to Online Banking**: Visit our website at [www.futurebank.com/online-banking](https://www.futurebank.com/online-banking) and log in with your credentials.
+2. **Navigate to Bill Pay**: Once logged in, go to the ""Bill Pay"" section.
+3. **Add a Payee**: Enter the details of the biller you wish to pay automatically.
+4. **Set Up Automatic Payments**: Choose the option to set up automatic payments. You will need to specify the amount, frequency, and start date for the payments.
+5. **Confirm and Save**: Review the details and confirm to save your automatic payment settings.
+
+If you encounter any issues or need further assistance, please feel free to contact our 24/7 Customer Service Hotline at 1-800-123-4567 or email us at support@futurebank.com.
+
+For more information, you can always visit our website: [www.futurebank.com](https://www.futurebank.com).
+
+Best regards,
+FutureBank Customer Service Team",ACCEPT,"The new response has effectively incorporated the SME feedback by presenting the steps to set up automatic bill payments as a numbered list. This format enhances clarity and usability, aligning with the SME's suggestion. Additionally, the response maintains the original content while adding helpful contact information for further assistance, which enriches the user experience without deviating from the core instructions. Thus, the new response is accurate, complete, and relevant, fully integrating the SME feedback."
+How long does it take to process an international wire transfer?,"International wire transfers typically take 1-3 business days to process, depending on the destination country and the receiving bank. Delays may occur due to time zone differences, currency conversions, or local banking regulations.",ACCEPT,nan,nan,"Thank you for reaching out to FutureBank with your question about international wire transfers.
+
+The processing time for international wire transfers can vary depending on several factors, including the destination country and the receiving bank's processing times. Generally, international wire transfers take between 1 to 5 business days to be completed.
+
+Here are the steps to initiate an international wire transfer with FutureBank:
+
+1. **Log in to Online Banking**: Visit our online banking portal at [www.futurebank.com/online-banking](www.futurebank.com/online-banking) or use our mobile app available on iOS and Android.
+2. **Navigate to Wire Transfers**: Go to the ""Transfers"" section and select ""International Wire Transfer.""
+3. **Enter Transfer Details**: Provide the recipient's bank details, including the SWIFT/BIC code, account number, and the recipient's full name and address.
+4. **Specify the Amount**: Enter the amount you wish to transfer and select the currency.
+5. **Review and Confirm**: Double-check all the details and confirm the transfer.
+
+If you have any further questions or need assistance, please feel free to contact our 24/7 Customer Service Hotline at 1-800-123-4567 or email us at support@futurebank.com.
+
+For more information, you can also visit our website: [www.futurebank.com](www.futurebank.com).
+
+Thank you for choosing FutureBank!
+
+Best regards,
+[Your Name]
+Customer Service Representative
+FutureBank",ACCEPT,"The new response provides a more comprehensive and detailed explanation compared to the old response. It not only addresses the processing time for international wire transfers but also includes a step-by-step guide on how to initiate a transfer with FutureBank. This additional information enhances the granularity of the response, offering practical guidance to the user.
+
+**Quality**: The new response is clear, coherent, and well-structured. It maintains a professional tone and provides a complete answer to the user's query, including contact information for further assistance.
+
+**Granularity**: The new response significantly exceeds the old response in terms of detail. It includes specific steps for initiating a transfer, which adds depth and practical value to the information provided.
+
+**Relevance**: The new response is highly relevant to the context, as it not only addresses the processing time but also provides actionable steps for the user. This aligns well with the likely needs of someone inquiring about international wire transfers.
+
+Overall, the new response surpasses the old response in all three criteria, making it a more valuable and informative answer."
+What documents do I need to provide to open a business account?,"To open a business account with FutureBank, you will need to provide the following documents: A valid government-issued ID, Your Social Security Number or Tax Identification Number (TIN), Business license or registration, Articles of incorporation (if applicable), Proof of address for the business. Additional documents may be required based on your business type.",ACCEPT,nan,nan,"Thank you for reaching out to FutureBank! To open a business account with us, you will need to provide the following documents:
+
+1. **Valid Identification**: Government-issued ID (e.g., driver's license, passport) for all individuals who will be signatories on the account.
+2. **Proof of Address**: Utility bill, lease agreement, or any official document that verifies the business address.
+3. **Business License**: A copy of your business license or registration.
+4. **Employer Identification Number (EIN)**: Issued by the IRS.
+5. **Operating Agreement or Partnership Agreement**: If applicable, to verify the structure and ownership of the business.
+6. **Articles of Incorporation or Organization**: For corporations or LLCs, respectively.
+
+You can open a business account by visiting any of our branches or applying online through our website. For more information, please visit [www.futurebank.com](www.futurebank.com).
+
+If you have any further questions or need assistance, feel free to contact our Customer Service Hotline at 1-800-123-4567 or email us at support@futurebank.com.
+
+Thank you for choosing FutureBank!",ACCEPT,"The new response provides a more detailed and comprehensive list of required documents, including specific examples for identification and proof of address, which enhances the granularity of the information. It also includes additional relevant details such as the Employer Identification Number (EIN) and operating agreements, which were not mentioned in the old response. Furthermore, the new response offers clear instructions on how to proceed with the application, including online and branch options, and provides contact information for further assistance. This additional information increases the relevance and utility of the response for the user. The quality of the new response is high, with a clear, friendly tone and well-organized structure, making it easy to understand and follow. Overall, the new response exceeds the old response in terms of granularity and relevance while maintaining high quality."
+How do I update my contact information for my FutureBank account?,"You can update your contact information by logging into your online banking account, navigating to the profile settings, and editing your details. Alternatively, you can visit a branch or contact customer service at 1-800-123-4567 to make the changes.",ACCEPT,nan,nan,"Dear Valued Customer,
+
+Thank you for reaching out to FutureBank. Updating your contact information is a straightforward process. Please follow the steps below to ensure your account details are up-to-date:
+
+1. **Online Banking:**
+   - Log in to your FutureBank online banking account at [www.futurebank.com/online-banking](www.futurebank.com/online-banking).
+   - Navigate to the ""Profile"" or ""Settings"" section.
+   - Select ""Update Contact Information.""
+   - Enter your new contact details and save the changes.
+
+2. **Mobile App:**
+   - Open the FutureBank mobile app on your iOS or Android device.
+   - Log in to your account.
+   - Go to the ""Settings"" menu.
+   - Choose ""Update Contact Information.""
+   - Enter your new contact details and confirm the changes.
+
+3. **In-Person:**
+   - Visit any of our branches with a valid ID.
+   - Speak with a customer service representative who will assist you in updating your contact information.
+
+4. **Customer Service Hotline:**
+   - Call our 24/7 customer service hotline at 1-800-123-4567.
+   - Verify your identity by providing the necessary information.
+   - Request to update your contact details with the representative.
+
+If you have any further questions or need additional assistance, please do not hesitate to contact us via email at support@futurebank.com or through our live chat available on our website from 9:00 AM - 8:00 PM (Mon-Fri).
+
+Thank you for banking with FutureBank.
+
+Best regards,
+
+[Your Name]  
+Customer Service Representative  
+FutureBank  
+[www.futurebank.com](www.futurebank.com)",ACCEPT,"The new response significantly enhances the old response in terms of quality, granularity, and relevance. 
+
+1. **Quality:** The new response is more structured and professional, beginning with a courteous greeting and ending with a signature, which adds a personal touch. It is clear, coherent, and maintains a formal tone throughout, which is appropriate for customer communication.
+
+2. **Granularity:** The new response provides a detailed step-by-step guide for updating contact information through multiple channels, including online banking, mobile app, in-person, and customer service hotline. This level of detail was not present in the old response, which only mentioned the options without elaboration.
+
+3. **Relevance:** The new response is highly relevant as it addresses the customer's needs comprehensively, offering multiple methods to update contact information and additional support options like email and live chat. This ensures that the customer has all the necessary information to proceed, regardless of their preferred method of communication.
+
+Overall, the new response not only matches but exceeds the old response in all evaluated areas, providing a more user-friendly and informative experience for the customer."
+Does FutureBank offer any special programs for first-time homebuyers?,"Yes, FutureBank offers special programs for first-time homebuyers, including lower down payments, competitive interest rates, and financial counseling. Please contact one of our mortgage specialists to learn more about the options available.",REJECT,It should provide concrete ways to contact mortgage specialists such as email.,nan,"Dear User,
+
+Thank you for reaching out to FutureBank with your inquiry. Yes, we do offer special programs for first-time homebuyers. Here are some of the key features of our first-time homebuyer programs:
+
+1. **Fixed and Variable Interest Rates**: We offer both fixed and variable interest rate options to suit your financial needs.
+2. **Competitive Rates**: Our interest rates are competitive to help make your home purchase more affordable.
+3. **Flexible Terms**: We provide flexible mortgage terms to fit your budget and financial goals.
+4. **Refinance Options**: If you already have a mortgage, we offer refinancing options to help you get better terms or lower your monthly payments.
+
+To learn more about our first-time homebuyer programs or to start your application, please visit our website at [www.futurebank.com](www.futurebank.com). You can also contact our customer service hotline at 1-800-123-4567 for further assistance.
+
+If you have any other questions or need additional information, feel free to reach out to us.
+
+Best regards,
+
+[Your Name]  
+Customer Service Representative  
+FutureBank  
+www.futurebank.com",REJECT,"The new response does not fully incorporate the SME feedback. While it provides a website link and a customer service hotline for further assistance, it fails to mention a direct method to contact mortgage specialists, such as an email address, as suggested by the SME. The SME feedback specifically requested concrete ways to contact mortgage specialists, which was not addressed in the new response. Therefore, the response lacks completeness in terms of integrating the SME's suggestions."
+What are the penalties for withdrawing funds from a CD before it matures?,I am unsure what CD in your question refers to. Please provide additional information.,REJECT,LLM did not understand that CD here refers to Certificate of Deposit,nan,"Dear Valued Customer,
+
+Thank you for reaching out to FutureBank with your inquiry about the penalties for withdrawing funds from a Certificate of Deposit (CD) before it matures.
+
+Withdrawing funds from a CD before its maturity date typically incurs an early withdrawal penalty. The specific penalty can vary based on the term of the CD and the amount withdrawn. Here are the general steps and considerations:
+
+1. **Review Your CD Terms**: The exact penalty details are outlined in the terms and conditions of your specific CD. You can find this information in your account documentation or by logging into your online banking account.
+
+2. **Contact Customer Service**: For precise information regarding your CD, you can contact our customer service team at 1-800-123-4567. Our representatives are available 24/7 to assist you.
+
+3. **Penalty Calculation**: Generally, the penalty may be calculated as a certain number of months' worth of interest. For example, a 6-month CD might have a penalty of 3 months' interest, while a 5-year CD might have a penalty of 6 months' interest.
+
+4. **Consider Alternatives**: If you need access to funds, consider other options such as a personal loan or a line of credit, which might be more cost-effective than incurring an early withdrawal penalty.
+
+For more detailed information, please visit our website at [www.futurebank.com](http://www.futurebank.com) or contact us directly.
+
+We hope this information helps. If you have any further questions or need additional assistance, please do not hesitate to reach out.
+
+Best regards,
+
+[Your Name]  
+Customer Service Representative  
+FutureBank  
+www.futurebank.com",ACCEPT,"The new response effectively incorporates the SME feedback by correctly identifying ""CD"" as a Certificate of Deposit, which was the primary concern in the SME feedback. The response provides a comprehensive explanation of the penalties associated with early withdrawal from a CD, addressing the accuracy and completeness of the information. Additionally, the response is relevant to the context of the original inquiry, as it provides detailed steps and considerations for the customer, enhancing the overall quality of the response. Therefore, the new response fully meets the criteria of accuracy, completeness, and relevance as per the SME feedback."
