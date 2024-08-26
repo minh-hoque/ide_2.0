@@ -1,6 +1,5 @@
 import os
-from typing import Tuple
-
+from typing import Tuple, Dict, List
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
@@ -9,8 +8,7 @@ from openai import OpenAI
 from css.style import apply_snorkel_style
 from helper.llms import query_gpt4, auto_evaluate_responses
 from helper.logging import get_logger
-from prompts.base_prompts import PROMPT_1, PROMPT_4
-import pandas as pd
+from prompts.base_prompts import PROMPT_4
 
 # Load environment variables and set up OpenAI client
 load_dotenv()
@@ -61,29 +59,17 @@ def load_data() -> pd.DataFrame:
         st.error("No file selected. Please try again.")
         st.stop()
 
-    if "df" not in st.session_state or selected_file != st.session_state.get(
-        "selected_file"
-    ):
-        try:
-            df = pd.read_csv(
-                os.path.join("./storage/manual_annotations", selected_file),
-                na_values=[
-                    "",
-                    "nan",
-                    "NaN",
-                    "None",
-                ],  # Specify values to be treated as NaN
-                keep_default_na=True,
-            )
-            df = preprocess_dataframe(df)
-            st.session_state.df = df
-            st.session_state.selected_file = selected_file
-        except FileNotFoundError:
-            logger.error(f"Selected file {selected_file} not found.")
-            st.error(f"Selected file {selected_file} not found. Please try again.")
-            st.stop()
-
-    return st.session_state.df
+    try:
+        df = pd.read_csv(
+            os.path.join("./storage/manual_annotations", selected_file),
+            na_values=["", "nan", "NaN", "None"],
+            keep_default_na=True,
+        )
+        return preprocess_dataframe(df)
+    except FileNotFoundError:
+        logger.error(f"Selected file {selected_file} not found.")
+        st.error(f"Selected file {selected_file} not found. Please try again.")
+        st.stop()
 
 
 def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -97,11 +83,8 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         "old_rating",
     ]
     df = df.drop(columns=columns_to_drop, errors="ignore")
-
-    # Convert 'edited_gt' and 'sme_feedback' to string, replacing NaN with empty string
     df["edited_gt"] = df["edited_gt"].fillna("").astype(str)
     df["sme_feedback"] = df["sme_feedback"].fillna("").astype(str)
-
     return df
 
 
@@ -124,6 +107,7 @@ def display_evaluated_responses(df: pd.DataFrame):
     )
 
 
+@st.cache_data
 def load_baseline_prompt() -> str:
     """Load the baseline prompt from file or use default."""
     try:
@@ -155,13 +139,13 @@ def display_prompt_dev_box(baseline_prompt: str, df: pd.DataFrame) -> Tuple[str,
         sme_feedback_container = st.container(height=600)
         with sme_feedback_container:
             for feedback in df["sme_feedback"]:
-                if feedback != "":
+                if feedback:
                     st.markdown(f"- {feedback}")
 
     return modified_prompt, model
 
 
-def calculate_metrics(auto_evaled_df: pd.DataFrame) -> dict:
+def calculate_metrics(auto_evaled_df: pd.DataFrame) -> Dict[str, float]:
     """Calculate metrics for the auto-evaluated responses."""
     total_responses = len(auto_evaled_df)
     accepted_responses = (auto_evaled_df["auto_evaluation"] == "ACCEPT").sum()
@@ -180,7 +164,6 @@ def calculate_metrics(auto_evaled_df: pd.DataFrame) -> dict:
     improvements = (
         (auto_evaled_df["rating"] == "REJECT")
         & (auto_evaled_df["auto_evaluation"] == "ACCEPT")
-        & (auto_evaled_df["sme_feedback"] != "")
     ).sum()
     improvement_percentage = (
         (improvements / total_previous_reject * 100) if total_previous_reject > 0 else 0
@@ -197,14 +180,16 @@ def calculate_metrics(auto_evaled_df: pd.DataFrame) -> dict:
     }
 
 
-def display_metrics(current_metrics: dict):
+def display_metrics(current_metrics: Dict[str, float]):
     """Display the calculated metrics with tooltips for descriptions and deltas."""
     st.subheader("Evaluation Metrics")
     col1, col2, col3 = st.columns(3)
 
     previous_metrics = st.session_state.get("previous_metrics", {})
 
-    def get_delta(current, previous, key):
+    def get_delta(
+        current: Dict[str, float], previous: Dict[str, float], key: str
+    ) -> Tuple[str, str]:
         if previous and key in previous:
             delta = current[key] - previous[key]
             delta_str = f"{delta:+.2f}%"
@@ -212,45 +197,39 @@ def display_metrics(current_metrics: dict):
             return delta_str, delta_color
         return None, None
 
-    with col1:
-        delta, color = get_delta(current_metrics, previous_metrics, "accept_percentage")
-        st.metric(
-            label="Accepted Responses",
-            value=f"{current_metrics['accept_percentage']:.2f}%",
-            delta=delta,
-            # delta_color=color,
-            help=f"Percentage of total responses that were accepted in this iteration. ({current_metrics['accepted_responses']} / {current_metrics['total_responses']})",
-        )
+    metrics_config = [
+        (
+            "Accepted Responses",
+            "accept_percentage",
+            f"Percentage of total responses that were accepted in this iteration. ({current_metrics['accepted_responses']} / {current_metrics['total_responses']})",
+        ),
+        (
+            "Regressions",
+            "regression_percentage",
+            f"Percentage of responses that were previously ACCEPT but now REJECT, out of all previously accepted responses. ({current_metrics['regressions']} regressions)",
+        ),
+        (
+            "Improvements",
+            "improvement_percentage",
+            f"Percentage of responses that were previously REJECT with SME feedback and are now ACCEPT, out of all previously rejected responses. ({current_metrics['improvements']} improvements)",
+        ),
+    ]
 
-    with col2:
-        delta, color = get_delta(
-            current_metrics, previous_metrics, "regression_percentage"
-        )
-        if delta:
-            color = (
-                "red" if color == "green" else "green"
-            )  # Invert color for regressions
-        st.metric(
-            label="Regressions",
-            value=f"{current_metrics['regression_percentage']:.2f}%",
-            delta=delta,
-            # delta_color=color,
-            help=f"Percentage of responses that were previously ACCEPT but now REJECT, out of all previously accepted responses. ({current_metrics['regressions']} regressions)",
-        )
+    for col, (label, key, help_text) in zip([col1, col2, col3], metrics_config):
+        with col:
+            delta, color = get_delta(current_metrics, previous_metrics, key)
+            if key == "regression_percentage" and delta:
+                color = (
+                    "red" if color == "green" else "green"
+                )  # Invert color for regressions
+            st.metric(
+                label=label,
+                value=f"{current_metrics[key]:.2f}%",
+                delta=delta,
+                # delta_color=color,  # Uncomment if you want to use color
+                help=help_text,
+            )
 
-    with col3:
-        delta, color = get_delta(
-            current_metrics, previous_metrics, "improvement_percentage"
-        )
-        st.metric(
-            label="Improvements",
-            value=f"{current_metrics['improvement_percentage']:.2f}%",
-            delta=delta,
-            # delta_color=color,
-            help=f"Percentage of responses that were previously REJECT with SME feedback and are now ACCEPT, out of all previously rejected responses. ({current_metrics['improvements']} improvements)",
-        )
-
-    # Store current metrics for next comparison
     st.session_state.previous_metrics = current_metrics
 
 
@@ -261,13 +240,11 @@ def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str):
         auto_eval_df = df.copy()
         auto_eval_df["new_response"] = new_responses
 
-        # Store the current auto_evaluation (if it exists) as old_auto_evaluation
-        if "auto_evaluation" in st.session_state.auto_evaled_df.columns:
-            auto_eval_df["old_auto_evaluation"] = st.session_state.auto_evaled_df[
-                "auto_evaluation"
-            ]
-        else:
-            auto_eval_df["old_auto_evaluation"] = "UNKNOWN"
+        auto_eval_df["old_auto_evaluation"] = (
+            st.session_state.auto_evaled_df.get("auto_evaluation", "UNKNOWN")
+            if "auto_evaled_df" in st.session_state
+            else "UNKNOWN"
+        )
 
         auto_evaled_df = auto_evaluate_responses(auto_eval_df)
 
@@ -278,7 +255,9 @@ def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str):
         st.session_state.auto_evaled_df = auto_evaled_df
 
 
-def generate_new_responses(df: pd.DataFrame, modified_prompt: str, model: str) -> list:
+def generate_new_responses(
+    df: pd.DataFrame, modified_prompt: str, model: str
+) -> List[str]:
     """Generate new responses using the modified prompt."""
     new_responses = []
     progress_bar = st.progress(0)
@@ -305,11 +284,7 @@ def display_preview_results(auto_evaled_df: pd.DataFrame):
     """Display the results of the preview with highlighted rows."""
     st.write("Responses generated with the modified prompt:")
 
-    # Create a new column for row color
     auto_evaled_df["row_color"] = "white"
-    print(auto_evaled_df["old_auto_evaluation"])
-
-    # Highlight rows based on changes in auto-evaluation
     auto_evaled_df.loc[
         (auto_evaled_df["old_auto_evaluation"] == "REJECT")
         & (auto_evaled_df["auto_evaluation"] == "ACCEPT"),
@@ -330,7 +305,7 @@ def display_preview_results(auto_evaled_df: pd.DataFrame):
             "rationale",
             "row_color",
         ]
-    ].copy()  # Create a copy to avoid SettingWithCopyWarning
+    ].copy()
 
     column_config = {
         "question": st.column_config.TextColumn("Question"),
@@ -344,17 +319,13 @@ def display_preview_results(auto_evaled_df: pd.DataFrame):
         "rationale": st.column_config.TextColumn("Rationale", width="large"),
     }
 
-    # Apply checkmark/cross to auto_evaluation column
     display_df["auto_evaluation"] = display_df["auto_evaluation"].apply(
         lambda x: "✅" if x == "ACCEPT" else "❌"
     )
 
-    # Define a function for styling
     def highlight_row_of_df(row):
-        print(row["row_color"])
         return ["background-color: " + row["row_color"]] * len(row)
 
-    # Apply styling and display the dataframe
     st.dataframe(
         display_df.style.apply(highlight_row_of_df, axis=1),
         column_config=column_config,
@@ -409,5 +380,4 @@ def main():
 
 
 if __name__ == "__main__":
-    print("Starting prompt iteration workflow...")
     main()
