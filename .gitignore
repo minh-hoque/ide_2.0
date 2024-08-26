@@ -170,3 +170,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Ignore __pycache__ directories and .pyc files in all subdirectories
+**/__pycache__/
+**/*.pyc
