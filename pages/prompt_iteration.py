@@ -260,6 +260,15 @@ def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str):
         new_responses = generate_new_responses(df, modified_prompt, model)
         auto_eval_df = df.copy()
         auto_eval_df["new_response"] = new_responses
+
+        # Store the current auto_evaluation (if it exists) as old_auto_evaluation
+        if "auto_evaluation" in st.session_state.auto_evaled_df.columns:
+            auto_eval_df["old_auto_evaluation"] = st.session_state.auto_evaled_df[
+                "auto_evaluation"
+            ]
+        else:
+            auto_eval_df["old_auto_evaluation"] = "UNKNOWN"
+
         auto_evaled_df = auto_evaluate_responses(auto_eval_df)
 
         metrics = calculate_metrics(auto_evaled_df)
@@ -293,24 +302,40 @@ def generate_new_responses(df: pd.DataFrame, modified_prompt: str, model: str) -
 
 
 def display_preview_results(auto_evaled_df: pd.DataFrame):
-    """Display the results of the preview."""
+    """Display the results of the preview with highlighted rows."""
     st.write("Responses generated with the modified prompt:")
+
+    # Create a new column for row color
+    auto_evaled_df["row_color"] = "white"
+    print(auto_evaled_df["old_auto_evaluation"])
+
+    # Highlight rows based on changes in auto-evaluation
+    auto_evaled_df.loc[
+        (auto_evaled_df["old_auto_evaluation"] == "REJECT")
+        & (auto_evaled_df["auto_evaluation"] == "ACCEPT"),
+        "row_color",
+    ] = "lightgreen"
+    auto_evaled_df.loc[
+        (auto_evaled_df["old_auto_evaluation"] == "ACCEPT")
+        & (auto_evaled_df["auto_evaluation"] == "REJECT"),
+        "row_color",
+    ] = "lightcoral"
+
     display_df = auto_evaled_df[
         [
             "question",
             "response",
             "new_response",
-            "rating",
             "auto_evaluation",
             "rationale",
+            "row_color",
         ]
-    ]
+    ].copy()  # Create a copy to avoid SettingWithCopyWarning
 
     column_config = {
         "question": st.column_config.TextColumn("Question"),
         "response": st.column_config.TextColumn("Original Response", width="large"),
         "new_response": st.column_config.TextColumn("New Response", width="large"),
-        "rating": st.column_config.TextColumn("Previous Rating", width="small"),
         "auto_evaluation": st.column_config.TextColumn(
             "Auto Evaluation",
             help="Green checkmark for ACCEPT, red X for REJECT",
@@ -319,20 +344,26 @@ def display_preview_results(auto_evaled_df: pd.DataFrame):
         "rationale": st.column_config.TextColumn("Rationale", width="large"),
     }
 
+    # Apply checkmark/cross to auto_evaluation column
     display_df["auto_evaluation"] = display_df["auto_evaluation"].apply(
         lambda x: "✅" if x == "ACCEPT" else "❌"
     )
 
-    st.data_editor(
-        display_df,
+    # Define a function for styling
+    def highlight_row_of_df(row):
+        print(row["row_color"])
+        return ["background-color: " + row["row_color"]] * len(row)
+
+    # Apply styling and display the dataframe
+    st.dataframe(
+        display_df.style.apply(highlight_row_of_df, axis=1),
         column_config=column_config,
         hide_index=True,
         use_container_width=True,
-        disabled=[
+        column_order=[
             "question",
             "response",
             "new_response",
-            "rating",
             "auto_evaluation",
             "rationale",
         ],
