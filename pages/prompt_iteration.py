@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
+from streamlit.delta_generator import DeltaGenerator
 
 from css.style import apply_snorkel_style
 from helper.llms import query_gpt4, auto_evaluate_responses
@@ -89,7 +90,7 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def display_evaluated_responses(df: pd.DataFrame):
-    """Display the evaluated responses in a data editor."""
+    """Display the evaluated responses in a dataframe and handle row selection."""
     st.subheader("Evaluated Responses")
     column_config = {
         "question": st.column_config.TextColumn("Question", width="medium"),
@@ -98,13 +99,23 @@ def display_evaluated_responses(df: pd.DataFrame):
         "edited_gt": st.column_config.TextColumn("Edited Ground Truth", width="large"),
         "sme_feedback": st.column_config.TextColumn("SME Feedback", width="large"),
     }
-    st.data_editor(
+
+    selection = st.dataframe(
         df,
         column_config=column_config,
-        hide_index=True,
-        num_rows="fixed",
         use_container_width=True,
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="single-row",  # Changed to single selection for simplicity
     )
+    selected_rows = selection.selection.rows
+    # st.write(selected_rows[0])
+    if selected_rows:
+        st.session_state.selected_row_index = selected_rows[0]
+        st.session_state.filtered_df = df.iloc[[st.session_state.selected_row_index]]
+    else:
+        st.session_state.selected_row_index = -1
+        st.session_state.filtered_df = pd.DataFrame()
 
 
 @st.cache_data
@@ -367,6 +378,78 @@ def send_for_sme_evaluation():
             )
 
 
+def iterate_on_specific_question(
+    filtered_df: pd.DataFrame, row_index: int, baseline_prompt: str
+):
+    """Allow user to iterate on a specific question with an improved UI."""
+    st.subheader("🔍 Iterate on Specific Question")
+
+    row = filtered_df.iloc[0]
+    question = row["question"]
+    original_response = row["response"]
+    rating = row["rating"]
+    edited_gt = row["edited_gt"]
+    sme_feedback = row["sme_feedback"]
+
+    # Display question, original response, and rating in three columns
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("#### Question")
+        st.markdown(question)
+    with col2:
+        st.markdown("#### Original Response")
+        st.markdown(original_response)
+    with col3:
+        st.markdown("#### Rating")
+        st.markdown(rating)
+
+    # Display edited ground truth and SME feedback if available
+    if edited_gt:
+        st.markdown(f"#### **Edited Ground Truth:**\n{edited_gt}")
+    if sme_feedback:
+        st.markdown(f"#### **SME Feedback:**\n{sme_feedback}")
+
+    model = st.selectbox(
+        "Select Model",
+        ["gpt-4o", "gpt-4o-2024-08-06", "gpt-4-turbo-preview"],
+        key="model_select_specific",
+    )
+    modified_prompt = st.text_area(
+        "Modified Prompt", value=baseline_prompt, height=600, key="prompt_specific"
+    )
+
+    # Generate new response
+    if st.button("Generate New Response", key="generate_specific"):
+        with st.spinner("Generating response..."):
+            formatted_prompt = modified_prompt.format(user_question=question)
+            new_response = query_gpt4(formatted_prompt, model=model)
+
+        st.markdown("### New Response")
+        st.markdown(new_response)
+
+        # Auto-evaluate the new response
+        auto_eval_df = pd.DataFrame(
+            {
+                "question": [question],
+                "response": [original_response],
+                "new_response": [new_response],
+                "rating": [rating],
+                "edited_gt": [edited_gt],
+                "sme_feedback": [sme_feedback],
+            }
+        )
+        auto_evaled_df = auto_evaluate_responses(auto_eval_df)
+
+        # Display auto-evaluation result with icon
+        auto_eval_result = auto_evaled_df.loc[0, "auto_evaluation"]
+        auto_eval_icon = "✅" if auto_eval_result == "ACCEPT" else "❌"
+        st.markdown(f"### Auto Evaluation\n{auto_eval_icon} {auto_eval_result}")
+
+        # Display rationale in an expander
+        with st.expander("See Evaluation Rationale"):
+            st.markdown(auto_evaled_df.loc[0, "rationale"])
+
+
 def main():
     """Main function to run the Streamlit app."""
     setup_page()
@@ -374,9 +457,18 @@ def main():
     df = load_data()
     display_evaluated_responses(df)
     baseline_prompt = load_baseline_prompt()
-    modified_prompt, model = display_prompt_dev_box(baseline_prompt, df)
-    preview_prompt(df, modified_prompt, model)
-    send_for_sme_evaluation()
+
+    if st.session_state.selected_row_index >= 0:
+        iterate_on_specific_question(
+            st.session_state.filtered_df,
+            st.session_state.selected_row_index,
+            baseline_prompt,
+        )
+    else:
+        modified_prompt, model = display_prompt_dev_box(baseline_prompt, df)
+        preview_prompt(df, modified_prompt, model)
+
+        send_for_sme_evaluation()
 
 
 if __name__ == "__main__":
