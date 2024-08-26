@@ -4,16 +4,20 @@ This project implements a Streamlit-based application for iterative prompt devel
 
 ## Features
 
-- Load and display evaluated responses
-- Modify baseline prompts
-- Preview new responses using selected AI models
-- Auto-evaluate generated responses
+- Load and display evaluated responses from CSV files
+- Modify baseline prompts with a user-friendly interface
+- Preview new responses using selected AI models (GPT-4 variants)
+- Auto-evaluate generated responses against original responses or SME feedback
+- Calculate and display evaluation metrics (acceptance rate, improvements, regressions)
 - Send responses for SME evaluation
+- Iterate on specific questions for focused improvement
+- Customizable logging levels for debugging and monitoring
 
 ## Prerequisites
 
-- Python 3.7+
+- Python 3.12.4+
 - pip (Python package manager)
+- OpenAI API key
 
 ## Installation
 
@@ -47,10 +51,17 @@ This project implements a Streamlit-based application for iterative prompt devel
   - `prompt_iteration.py`: Prompt development and iteration page
   - `manual_annotation.py`: Page for manual annotation of responses
   - `auto_evaluation.py`: Page for automatic evaluation of responses
-- `css/style.py`: Custom CSS styles
-- `helper/`: Helper functions for logging, LLM interactions, etc.
-- `prompts/`: Base prompts
-- `storage/`: Directory for storing data files
+- `css/style.py`: Custom CSS styles for improved UI
+- `helper/`:
+  - `llms.py`: Functions for interacting with language models
+  - `logging.py`: Custom logging setup
+- `prompts/`:
+  - `base_prompts.py`: Default prompts for the system
+  - `auto_evaluation_prompts.py`: Prompts for auto-evaluation
+- `storage/`:
+  - `manual_annotations/`: Directory for storing manually annotated responses
+  - `iteration_responses/`: Directory for storing responses from iteration
+  - `baseline_prompt.txt`: File containing the baseline prompt
 
 ## Running the Application
 
@@ -69,12 +80,14 @@ To run the full application with all pages:
    - Prompt Iteration
    - Manual Annotation
 
-Each page provides specific functionality for the prompt development workflow.
+## Usage Guide
 
-## Contributing
+1. **Load Data**: Start by selecting an evaluated responses file from the dropdown menu.
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+2. **Modify Prompt**: Use the "Prompt Dev Box" to modify the baseline prompt. You can view SME feedback to guide your modifications.
 
-## License
+3. **Preview Responses**: Click "Preview Prompt" to generate new responses using the modified prompt. The system will auto-evaluate these responses and display metrics.
+
+4. **Iterate on Specific Questions**: Click on a specific row in the evaluated responses table to focus on improving that particular question-answer pair.
 
 This project is licensed under the MIT License - see the LICENSE file for details.
