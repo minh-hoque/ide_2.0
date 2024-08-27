@@ -13,7 +13,7 @@ st.markdown(apply_snorkel_style(), unsafe_allow_html=True)
 
 # Snorkel logo
 logo = Image.open("images/snorkel-ai.png")
-st.image(logo, width=400)
+st.image(logo, width=350)
 
 
 # Main header
