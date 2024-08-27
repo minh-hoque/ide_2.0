@@ -5,6 +5,7 @@ def apply_snorkel_style():
     light_blue = "#84ceff"
     dark_blue = "#14194d"
     white = "#FFFFFF"
+    light_gray = "#F0F2F6"
 
     snorkel_css = f"""
         <style>
@@ -57,6 +58,34 @@ def apply_snorkel_style():
                 font-size: 0.9rem;
                 color: {dark_blue};
                 margin-top: 50px;
+            }}
+            .stSidebar {{
+                background-color: {light_blue};
+                padding: 20px;
+            }}
+            .stSidebar .sidebar-content {{
+                background-color: {white};
+                border-radius: 10px;
+                padding: 20px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }}
+            .stTextInput>div>div>input {{
+                border-radius: 5px;
+            }}
+            .stSelectbox>div>div>select {{
+                border-radius: 5px;
+            }}
+            .stDataFrame {{
+                border: 1px solid {light_blue};
+                border-radius: 10px;
+                overflow: hidden;
+            }}
+            .stDataFrame thead {{
+                background-color: {light_blue};
+                color: {dark_blue};
+            }}
+            .stDataFrame td {{
+                text-align: left;
             }}
         </style>
     """
