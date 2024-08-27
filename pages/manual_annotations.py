@@ -42,10 +42,21 @@ def display_question_and_response(
             help=rationale,
         )
         col1, col2 = st.columns(2)
-        col1.write("**Old Response:**")
-        col1.write(row["old_response"])
-        col2.write("**New Response:**")
-        col2.write(response_text)
+        with col1:
+            st.markdown(
+                f'<div style="background-color: #f0f0f0; padding: 10px; border-radius: 5px;">'
+                f'<strong>Old Response:</strong><br>{row["old_response"]}'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        with col2:
+            st.markdown(
+                f'<div style="background-color: #f0f0f0; padding: 10px; border-radius: 5px;">'
+                f"<strong>New Response:</strong><br>{response_text}"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
     else:
         st.markdown(f"##### **Question {question_number}**: {question_text}")
         st.write(f"**Response:** {response_text}")
@@ -121,19 +132,15 @@ def display_and_rate_response(
 ) -> pd.DataFrame:
     """
     Display a response and allow the user to rate it.
-
-    Args:
-        index (int): The index of the current question.
-        row (pd.Series): A row from the DataFrame containing question and response data.
-        is_iteration (bool): Whether this is an iteration of responses.
-        df (pd.DataFrame): The DataFrame containing all annotations.
-
-    Returns:
-        pd.DataFrame: The updated DataFrame with the new rating and feedback.
     """
     display_question_and_response(index, row, is_iteration)
 
-    default_index = 0 if row.get("auto_evaluation") == "ACCEPT" else 1
+    default_index = 0  # Default to ACCEPT
+    if is_iteration:
+        default_index = 0 if row.get("auto_evaluation") == "ACCEPT" else 1
+    elif "rating" in row:
+        default_index = 0 if row["rating"] == "ACCEPT" else 1
+
     rating = st.radio(
         f"Rate the response for Question {index + 1}:",
         ("ACCEPT", "REJECT"),
