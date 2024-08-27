@@ -70,7 +70,7 @@ def query_gpt4(
         return f"Error: {str(e)}"
 
 
-@st.cache_data
+@st.cache_resource
 def query_structured_gpt4(
     prompt: str, system_prompt: str = "", model: str = "gpt-4o-2024-08-06"
 ) -> AutoEvaluationResult:
@@ -83,7 +83,8 @@ def query_structured_gpt4(
         model (str, optional): The specific GPT-4 model to use. Defaults to "gpt-4o-2024-08-06".
 
     Returns:
-        AutoEvaluationResult: A structured result containing the rationale and evaluation result.
+        AutoEvaluationResult: A structured object containing the parsed response from GPT-4.
+                              This includes fields for 'rationale' (str) and 'result' (str).
     """
     try:
         # Prepare messages for the chat completion
@@ -100,11 +101,13 @@ def query_structured_gpt4(
             temperature=0,
             response_format=AutoEvaluationResult,
         )
-        logger.info("Structured GPT-4 Response: %s", response.choices[0].message.parsed)
-        return response
+        logger.info(
+            "Structured GPT-4 Response: \n%s", response.choices[0].message.parsed
+        )
+        return response.choices[0].message.parsed
     except Exception as e:
         logger.error("Error querying structured GPT-4: %s", str(e))
-        raise
+        raise e
 
 
 # Helper functions

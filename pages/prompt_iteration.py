@@ -1,5 +1,5 @@
 import os
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict, List, Optional
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
@@ -19,11 +19,8 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 logger = get_logger(__name__)
 
 
-def setup_page():
-    """
-    Set up the Streamlit page configuration.
-    This function configures the page title, icon, layout, and applies custom CSS styling.
-    """
+def setup_page() -> None:
+    """Set up the Streamlit page configuration."""
     st.set_page_config(
         page_title="Prompt Iteration", page_icon=":pencil2:", layout="wide"
     )
@@ -33,11 +30,8 @@ def setup_page():
     )
 
 
-def setup_logging():
-    """
-    Set up logging level selector.
-    Allows users to choose the logging level for the application.
-    """
+def setup_logging() -> None:
+    """Set up logging level selector."""
     logging_level = st.selectbox(
         "Select Logging Level",
         ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
@@ -53,7 +47,6 @@ def load_data() -> pd.DataFrame:
     Returns:
         pd.DataFrame: Preprocessed dataframe containing evaluated responses.
     """
-    # List all CSV files in the manual_annotations directory
     eval_files = [
         f
         for f in os.listdir("./storage/manual_annotations")
@@ -87,7 +80,7 @@ def load_data() -> pd.DataFrame:
 
 def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Preprocess the loaded dataframe by dropping unnecessary columns and handling missing values.
+    Preprocess the loaded dataframe.
 
     Args:
         df (pd.DataFrame): Raw dataframe loaded from CSV.
@@ -109,7 +102,7 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def display_evaluated_responses(df: pd.DataFrame):
+def display_evaluated_responses(df: pd.DataFrame) -> None:
     """
     Display the evaluated responses in a dataframe and handle row selection.
 
@@ -125,22 +118,29 @@ def display_evaluated_responses(df: pd.DataFrame):
         "sme_feedback": st.column_config.TextColumn("SME Feedback", width="large"),
     }
 
-    selection = st.dataframe(
-        df,
-        column_config=column_config,
-        use_container_width=True,
-        hide_index=True,
-        on_select="rerun",
-        selection_mode="single-row",  # Changed to single selection for simplicity
-    )
-    selected_rows = selection.selection.rows
-    # st.write(selected_rows[0])
-    if selected_rows:
-        st.session_state.selected_row_index = selected_rows[0]
-        st.session_state.filtered_df = df.iloc[[st.session_state.selected_row_index]]
+    if st.session_state.get("selected_row_index", -1) >= 0:
+        st.dataframe(
+            st.session_state.filtered_df,
+            column_config=column_config,
+            use_container_width=True,
+            hide_index=True,
+        )
     else:
-        st.session_state.selected_row_index = -1
-        st.session_state.filtered_df = pd.DataFrame()
+        selection = st.dataframe(
+            df,
+            column_config=column_config,
+            use_container_width=True,
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row",
+        )
+        selected_rows = selection.selection.rows
+        if selected_rows:
+            st.session_state.selected_row_index = selected_rows[0]
+            st.session_state.filtered_df = df.iloc[
+                [st.session_state.selected_row_index]
+            ]
+            st.rerun()
 
 
 @st.cache_data
@@ -238,7 +238,7 @@ def calculate_metrics(auto_evaled_df: pd.DataFrame) -> Dict[str, float]:
     }
 
 
-def display_metrics(current_metrics: Dict[str, float]):
+def display_metrics(current_metrics: Dict[str, float]) -> None:
     """
     Display the calculated metrics with tooltips for descriptions and deltas.
 
@@ -252,7 +252,7 @@ def display_metrics(current_metrics: Dict[str, float]):
 
     def get_delta(
         current: Dict[str, float], previous: Dict[str, float], key: str
-    ) -> Tuple[str, str]:
+    ) -> Tuple[Optional[str], Optional[str]]:
         if previous and key in previous:
             delta = current[key] - previous[key]
             delta_str = f"{delta:+.2f}%"
@@ -296,7 +296,7 @@ def display_metrics(current_metrics: Dict[str, float]):
     st.session_state.previous_metrics = current_metrics
 
 
-def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str):
+def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str) -> None:
     """
     Preview the modified prompt by generating new responses and displaying results.
 
@@ -360,7 +360,7 @@ def generate_new_responses(
     return new_responses
 
 
-def display_preview_results(auto_evaled_df: pd.DataFrame):
+def display_preview_results(auto_evaled_df: pd.DataFrame) -> None:
     """
     Display the results of the preview with highlighted rows for improvements and regressions.
 
@@ -426,10 +426,8 @@ def display_preview_results(auto_evaled_df: pd.DataFrame):
     )
 
 
-def send_for_sme_evaluation():
-    """
-    Save the generated responses for SME evaluation.
-    """
+def send_for_sme_evaluation() -> None:
+    """Save the generated responses for SME evaluation."""
     if st.button("Send for SME Evaluation"):
         if "auto_evaled_df" in st.session_state:
             df_to_save = st.session_state.auto_evaled_df.rename(
@@ -456,7 +454,7 @@ def send_for_sme_evaluation():
 
 def iterate_on_specific_question(
     filtered_df: pd.DataFrame, row_index: int, baseline_prompt: str
-):
+) -> None:
     """
     Allow user to iterate on a specific question with an improved UI.
 
@@ -468,42 +466,39 @@ def iterate_on_specific_question(
     st.subheader("🔍 Iterate on Specific Question")
 
     row = filtered_df.iloc[0]
-    question = row["question"]
-    original_response = row["response"]
-    rating = row["rating"]
-    edited_gt = row["edited_gt"]
-    sme_feedback = row["sme_feedback"]
+    question, original_response, rating = (
+        row["question"],
+        row["response"],
+        row["rating"],
+    )
+    edited_gt, sme_feedback = row["edited_gt"], row["sme_feedback"]
 
     # Display question, original response, and rating in three columns
     col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("#### Question")
-        st.markdown(question)
-    with col2:
-        st.markdown("#### Original Response")
-        st.markdown(original_response)
-    with col3:
-        st.markdown("#### Rating")
-        st.markdown(rating)
+    for col, title, content in zip(
+        [col1, col2, col3],
+        ["Question", "Original Response", "Rating"],
+        [question, original_response, rating],
+    ):
+        with col:
+            st.markdown(
+                f"<h4 style='text-align: center;'>{title}</h4>", unsafe_allow_html=True
+            )
+            st.markdown(
+                f"<div style='text-align: center; background-color: #f0f0f0; padding: 10px; border-radius: 5px;'>{content}</div>",
+                unsafe_allow_html=True,
+            )
 
-    # Display edited ground truth and SME feedback if available
     if edited_gt:
         st.markdown(f"#### **Edited Ground Truth:**\n{edited_gt}")
-    if sme_feedback:
-        st.markdown(f"#### **SME Feedback:**\n{sme_feedback}")
 
-    modified_prompt, model = display_prompt_dev_box(baseline_prompt, row)
+    modified_prompt, model = display_prompt_dev_box(baseline_prompt, filtered_df)
 
-    # model = st.selectbox(
-    #     "Select Model",
-    #     ["gpt-4o", "gpt-4o-2024-08-06", "gpt-4-turbo-preview"],
-    #     key="model_select_specific",
-    # )
-    # modified_prompt = st.text_area(
-    #     "Modified Prompt", value=baseline_prompt, height=600, key="prompt_specific"
-    # )
+    if st.button("Show All Questions"):
+        st.session_state.selected_row_index = -1
+        st.session_state.filtered_df = pd.DataFrame()
+        st.rerun()
 
-    # Generate new response
     if st.button("Generate New Response", key="generate_specific"):
         with st.spinner("Generating response..."):
             formatted_prompt = modified_prompt.format(user_question=question)
@@ -535,17 +530,15 @@ def iterate_on_specific_question(
             st.markdown(auto_evaled_df.loc[0, "rationale"])
 
 
-def main():
-    """
-    Main function to run the Streamlit app for prompt iteration.
-    """
+def main() -> None:
+    """Main function to run the Streamlit app for prompt iteration."""
     setup_page()
     setup_logging()
     df = load_data()
     display_evaluated_responses(df)
     baseline_prompt = load_baseline_prompt()
 
-    if st.session_state.selected_row_index >= 0:
+    if st.session_state.get("selected_row_index", -1) >= 0:
         iterate_on_specific_question(
             st.session_state.filtered_df,
             st.session_state.selected_row_index,
@@ -554,7 +547,6 @@ def main():
     else:
         modified_prompt, model = display_prompt_dev_box(baseline_prompt, df)
         preview_prompt(df, modified_prompt, model)
-
         send_for_sme_evaluation()
 
 
