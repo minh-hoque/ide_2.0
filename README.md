@@ -61,7 +61,6 @@ This project implements a Streamlit-based application for iterative prompt devel
 - `storage/`:
   - `manual_annotations/`: Directory for storing manually annotated responses
   - `iteration_responses/`: Directory for storing responses from iteration
-  - `baseline_prompt.txt`: File containing the baseline prompt
 
 ## Running the Application
 
