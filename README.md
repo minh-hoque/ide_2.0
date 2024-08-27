@@ -12,6 +12,7 @@ This project implements a Streamlit-based application for iterative prompt devel
 - Send responses for SME evaluation
 - Iterate on specific questions for focused improvement
 - Customizable logging levels for debugging and monitoring
+- Stylish UI with custom CSS
 
 ## Prerequisites
 
@@ -49,8 +50,7 @@ This project implements a Streamlit-based application for iterative prompt devel
 - `main.py`: Main entry point for the Streamlit application
 - `pages/`:
   - `prompt_iteration.py`: Prompt development and iteration page
-  - `manual_annotation.py`: Page for manual annotation of responses
-  - `auto_evaluation.py`: Page for automatic evaluation of responses
+  - `manual_annotations.py`: Page for manual annotation of responses
 - `css/style.py`: Custom CSS styles for improved UI
 - `helper/`:
   - `llms.py`: Functions for interacting with language models
@@ -82,12 +82,45 @@ To run the full application with all pages:
 
 ## Usage Guide
 
-1. **Load Data**: Start by selecting an evaluated responses file from the dropdown menu.
+### Manual Annotations Page
 
-2. **Modify Prompt**: Use the "Prompt Dev Box" to modify the baseline prompt. You can view SME feedback to guide your modifications.
+1. Upload a CSV file containing questions and responses.
+2. Rate each response as "ACCEPT" or "REJECT".
+3. Provide feedback and edited ground truth for rejected responses.
+4. Submit annotations to save them for further processing.
 
+### Prompt Iteration Page
+
+1. **Load Data**: Select an evaluated responses file from the dropdown menu.
+2. **Modify Prompt**: Use the "Prompt Dev Box" to modify the baseline prompt. View SME feedback to guide your modifications.
 3. **Preview Responses**: Click "Preview Prompt" to generate new responses using the modified prompt. The system will auto-evaluate these responses and display metrics.
-
 4. **Iterate on Specific Questions**: Click on a specific row in the evaluated responses table to focus on improving that particular question-answer pair.
+5. **Send for SME Evaluation**: After previewing and iterating, send the new responses for SME evaluation.
+
+## Key Components
+
+### LLM Interaction (`helper/llms.py`)
+
+- `query_gpt4`: Function to query GPT-4 models with various parameters.
+- `query_structured_gpt4`: Function to query GPT-4 and parse responses into structured format.
+- `auto_evaluate_responses`: Function to automatically evaluate new responses against old ones or SME feedback.
+
+### Logging (`helper/logging.py`)
+
+- Custom colored logging setup for better debugging and monitoring.
+
+### Prompts (`prompts/auto_evaluation_prompts.py`)
+
+- Contains prompts for auto-evaluation of responses, including equivalence checking and SME feedback incorporation.
+
+### UI Styling (`css/style.py`)
+
+- Custom CSS styles for a more polished and user-friendly interface.
+
+## Contributing
+
+Contributions to this project are welcome :)!
+
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
