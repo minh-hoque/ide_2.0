@@ -2,12 +2,15 @@ import streamlit as st
 import pandas as pd
 from css.style import apply_snorkel_style
 from helper.logging import get_logger
+from typing import Tuple
 
 logger = get_logger(__name__)
 
 
 def setup_page():
-    """Configure the page and apply styles."""
+    """
+    Set up the Streamlit page configuration for manual annotations.
+    """
     st.set_page_config(
         page_title="Manual Annotations", page_icon=":clipboard:", layout="wide"
     )
@@ -18,7 +21,14 @@ def setup_page():
 def display_question_and_response(
     index: int, row: pd.Series, is_iteration: bool = False
 ):
-    """Render the question and response(s) for a given row."""
+    """
+    Display a single question and its response.
+
+    Args:
+        index (int): The index of the current question.
+        row (pd.Series): A row from the DataFrame containing question and response data.
+        is_iteration (bool, optional): Whether this is an iteration of responses. Defaults to False.
+    """
     question_number = index + 1
     question_text = row["question"]
     response_text = row["response"]
@@ -26,26 +36,35 @@ def display_question_and_response(
     if is_iteration:
         auto_eval_icon = "✅" if row.get("auto_evaluation") == "ACCEPT" else "❌"
         rationale = row.get("rationale", "")
-        rationale = "" if pd.isna(rationale) else rationale
 
         st.markdown(
             f"##### **Question {question_number}**: {question_text} ➪ Auto Evaluation: {auto_eval_icon}",
             help=rationale,
         )
         col1, col2 = st.columns(2)
-        with col1:
-            st.write("**Old Response:**")
-            st.write(row["old_response"])
-        with col2:
-            st.write("**New Response:**")
-            st.write(response_text)
+        col1.write("**Old Response:**")
+        col1.write(row["old_response"])
+        col2.write("**New Response:**")
+        col2.write(response_text)
     else:
         st.markdown(f"##### **Question {question_number}**: {question_text}")
         st.write(f"**Response:** {response_text}")
 
 
-def get_user_feedback(index: int, rating: str, old_feedback: str = ""):
-    """Collect user feedback for rejected responses."""
+def get_user_feedback(
+    index: int, rating: str, old_feedback: str = ""
+) -> Tuple[str, str]:
+    """
+    Get user feedback for a response.
+
+    Args:
+        index (int): The index of the current question.
+        rating (str): The current rating of the response.
+        old_feedback (str, optional): Previous feedback, if any. Defaults to "".
+
+    Returns:
+        Tuple[str, str]: A tuple containing the edited ground truth and SME feedback.
+    """
     if rating == "ACCEPT":
         return "", ""
 
@@ -53,10 +72,9 @@ def get_user_feedback(index: int, rating: str, old_feedback: str = ""):
         "Provide the correct ground truth response (optional):",
         key=f"ground_truth_{index}",
     )
-
     sme_feedback = st.text_area(
         "Provide feedback for the data scientist:",
-        value=old_feedback if old_feedback != "" else "",
+        value=old_feedback,
         key=f"feedback_{index}",
         placeholder="Enter your feedback here...",
     )
@@ -65,16 +83,33 @@ def get_user_feedback(index: int, rating: str, old_feedback: str = ""):
 
 def update_annotation(
     df: pd.DataFrame, index: int, rating: str, edited_gt: str, sme_feedback: str
-):
-    """Update the dataframe with user annotations."""
+) -> pd.DataFrame:
+    """
+    Update the annotation for a specific row in the DataFrame.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing all annotations.
+        index (int): The index of the row to update.
+        rating (str): The new rating for the response.
+        edited_gt (str): The edited ground truth, if any.
+        sme_feedback (str): The SME feedback, if any.
+
+    Returns:
+        pd.DataFrame: The updated DataFrame.
+    """
     df.loc[index, "rating"] = rating
-    df.loc[index, "sme_feedback"] = sme_feedback if sme_feedback != "" else ""
-    df.loc[index, "edited_gt"] = edited_gt if edited_gt != "" else ""
+    df.loc[index, "sme_feedback"] = sme_feedback
+    df.loc[index, "edited_gt"] = edited_gt
     return df
 
 
 def save_annotations(df: pd.DataFrame):
-    """Save the annotated dataframe to a CSV file."""
+    """
+    Save the annotated DataFrame to a CSV file.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing all annotations.
+    """
     if st.button("Submit Annotations"):
         output_path = "./storage/manual_annotations/evaluated_responses_2.csv"
         df.to_csv(output_path, index=False)
@@ -83,8 +118,19 @@ def save_annotations(df: pd.DataFrame):
 
 def display_and_rate_response(
     index: int, row: pd.Series, is_iteration: bool, df: pd.DataFrame
-):
-    """Display the response and collect user rating."""
+) -> pd.DataFrame:
+    """
+    Display a response and allow the user to rate it.
+
+    Args:
+        index (int): The index of the current question.
+        row (pd.Series): A row from the DataFrame containing question and response data.
+        is_iteration (bool): Whether this is an iteration of responses.
+        df (pd.DataFrame): The DataFrame containing all annotations.
+
+    Returns:
+        pd.DataFrame: The updated DataFrame with the new rating and feedback.
+    """
     display_question_and_response(index, row, is_iteration)
 
     default_index = 0 if row.get("auto_evaluation") == "ACCEPT" else 1
@@ -97,11 +143,16 @@ def display_and_rate_response(
 
     old_feedback = row.get("sme_feedback", "")
     edited_gt, sme_feedback = get_user_feedback(index, rating, old_feedback)
-    df = update_annotation(df, index, rating, edited_gt, sme_feedback)
+    return update_annotation(df, index, rating, edited_gt, sme_feedback)
 
 
 def process_annotations(uploaded_file):
-    """Process the uploaded CSV file and handle annotations."""
+    """
+    Process the uploaded CSV file containing responses for annotation.
+
+    Args:
+        uploaded_file: The uploaded CSV file containing responses.
+    """
     df = pd.read_csv(uploaded_file, na_values=["", "nan", "NaN", "None"])
     required_columns = ["question", "response"]
 
@@ -112,7 +163,6 @@ def process_annotations(uploaded_file):
         return
 
     is_iteration = "rationale" in df.columns and "auto_evaluation" in df.columns
-    has_old_feedback = "sme_feedback" in df.columns
 
     if is_iteration:
         st.markdown("#### Displaying responses after prompt iteration")
@@ -124,25 +174,19 @@ def process_annotations(uploaded_file):
 
         if use_expander:
             with st.expander(f"Question {index + 1} (ACCEPT)"):
-                display_and_rate_response(index, row, is_iteration, df)
+                df = display_and_rate_response(index, row, is_iteration, df)
         else:
-            display_and_rate_response(index, row, is_iteration, df)
+            df = display_and_rate_response(index, row, is_iteration, df)
 
         st.markdown("<hr>", unsafe_allow_html=True)
 
     save_annotations(df)
 
 
-def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Preprocess the loaded dataframe."""
-    # Convert 'edited_gt' and 'sme_feedback' to string, replacing NaN with empty string
-    df["edited_gt"] = df["edited_gt"].fillna("").astype(str)
-    df["sme_feedback"] = df["sme_feedback"].fillna("").astype(str)
-    return df
-
-
 def main():
-    """Main execution function."""
+    """
+    Main function to run the Streamlit app for manual annotations.
+    """
     setup_page()
     uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
 

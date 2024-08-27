@@ -20,7 +20,10 @@ logger = get_logger(__name__)
 
 
 def setup_page():
-    """Set up the Streamlit page configuration."""
+    """
+    Set up the Streamlit page configuration.
+    This function configures the page title, icon, layout, and applies custom CSS styling.
+    """
     st.set_page_config(
         page_title="Prompt Iteration", page_icon=":pencil2:", layout="wide"
     )
@@ -31,7 +34,10 @@ def setup_page():
 
 
 def setup_logging():
-    """Set up logging level selector."""
+    """
+    Set up logging level selector.
+    Allows users to choose the logging level for the application.
+    """
     logging_level = st.selectbox(
         "Select Logging Level",
         ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
@@ -41,7 +47,13 @@ def setup_logging():
 
 
 def load_data() -> pd.DataFrame:
-    """Load and prepare the dataframe."""
+    """
+    Load and prepare the dataframe from evaluated responses.
+
+    Returns:
+        pd.DataFrame: Preprocessed dataframe containing evaluated responses.
+    """
+    # List all CSV files in the manual_annotations directory
     eval_files = [
         f
         for f in os.listdir("./storage/manual_annotations")
@@ -74,7 +86,15 @@ def load_data() -> pd.DataFrame:
 
 
 def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Preprocess the loaded dataframe."""
+    """
+    Preprocess the loaded dataframe by dropping unnecessary columns and handling missing values.
+
+    Args:
+        df (pd.DataFrame): Raw dataframe loaded from CSV.
+
+    Returns:
+        pd.DataFrame: Preprocessed dataframe.
+    """
     columns_to_drop = [
         "label",
         "feedback",
@@ -90,7 +110,12 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def display_evaluated_responses(df: pd.DataFrame):
-    """Display the evaluated responses in a dataframe and handle row selection."""
+    """
+    Display the evaluated responses in a dataframe and handle row selection.
+
+    Args:
+        df (pd.DataFrame): Dataframe containing evaluated responses.
+    """
     st.subheader("Evaluated Responses")
     column_config = {
         "question": st.column_config.TextColumn("Question", width="medium"),
@@ -120,7 +145,12 @@ def display_evaluated_responses(df: pd.DataFrame):
 
 @st.cache_data
 def load_baseline_prompt() -> str:
-    """Load the baseline prompt from file or use default."""
+    """
+    Load the baseline prompt from file or use default if not found.
+
+    Returns:
+        str: Baseline prompt text.
+    """
     try:
         with open("./storage/baseline_prompt.txt", "r") as f:
             return f.read()
@@ -130,7 +160,16 @@ def load_baseline_prompt() -> str:
 
 
 def display_prompt_dev_box(baseline_prompt: str, df: pd.DataFrame) -> Tuple[str, str]:
-    """Display the prompt development box for development."""
+    """
+    Display the prompt development box for modifying the baseline prompt.
+
+    Args:
+        baseline_prompt (str): Initial baseline prompt.
+        df (pd.DataFrame): Dataframe containing SME feedback.
+
+    Returns:
+        Tuple[str, str]: Modified prompt and selected model.
+    """
     st.subheader("Prompt Dev Box")
     st.write(
         "Modify the baseline prompt based on the feedback and evaluated responses."
@@ -157,7 +196,15 @@ def display_prompt_dev_box(baseline_prompt: str, df: pd.DataFrame) -> Tuple[str,
 
 
 def calculate_metrics(auto_evaled_df: pd.DataFrame) -> Dict[str, float]:
-    """Calculate metrics for the auto-evaluated responses."""
+    """
+    Calculate metrics for the auto-evaluated responses.
+
+    Args:
+        auto_evaled_df (pd.DataFrame): Dataframe with auto-evaluated responses.
+
+    Returns:
+        Dict[str, float]: Dictionary containing calculated metrics.
+    """
     total_responses = len(auto_evaled_df)
     accepted_responses = (auto_evaled_df["auto_evaluation"] == "ACCEPT").sum()
     accept_percentage = (accepted_responses / total_responses) * 100
@@ -192,7 +239,12 @@ def calculate_metrics(auto_evaled_df: pd.DataFrame) -> Dict[str, float]:
 
 
 def display_metrics(current_metrics: Dict[str, float]):
-    """Display the calculated metrics with tooltips for descriptions and deltas."""
+    """
+    Display the calculated metrics with tooltips for descriptions and deltas.
+
+    Args:
+        current_metrics (Dict[str, float]): Dictionary of current metrics.
+    """
     st.subheader("Evaluation Metrics")
     col1, col2, col3 = st.columns(3)
 
@@ -245,7 +297,14 @@ def display_metrics(current_metrics: Dict[str, float]):
 
 
 def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str):
-    """Preview the modified prompt and generate new responses."""
+    """
+    Preview the modified prompt by generating new responses and displaying results.
+
+    Args:
+        df (pd.DataFrame): Original dataframe with questions.
+        modified_prompt (str): Modified prompt to be tested.
+        model (str): Selected language model for generation.
+    """
     if st.button("Preview Prompt"):
         new_responses = generate_new_responses(df, modified_prompt, model)
         auto_eval_df = df.copy()
@@ -269,7 +328,17 @@ def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str):
 def generate_new_responses(
     df: pd.DataFrame, modified_prompt: str, model: str
 ) -> List[str]:
-    """Generate new responses using the modified prompt."""
+    """
+    Generate new responses using the modified prompt.
+
+    Args:
+        df (pd.DataFrame): Dataframe containing questions.
+        modified_prompt (str): Modified prompt to use for generation.
+        model (str): Selected language model.
+
+    Returns:
+        List[str]: List of generated responses.
+    """
     new_responses = []
     progress_bar = st.progress(0)
     progress_text = st.empty()
@@ -292,7 +361,12 @@ def generate_new_responses(
 
 
 def display_preview_results(auto_evaled_df: pd.DataFrame):
-    """Display the results of the preview with highlighted rows."""
+    """
+    Display the results of the preview with highlighted rows for improvements and regressions.
+
+    Args:
+        auto_evaled_df (pd.DataFrame): Dataframe with auto-evaluated new responses.
+    """
     st.write("Responses generated with the modified prompt:")
 
     auto_evaled_df["row_color"] = "white"
@@ -353,7 +427,9 @@ def display_preview_results(auto_evaled_df: pd.DataFrame):
 
 
 def send_for_sme_evaluation():
-    """Send the generated responses for SME evaluation."""
+    """
+    Save the generated responses for SME evaluation.
+    """
     if st.button("Send for SME Evaluation"):
         if "auto_evaled_df" in st.session_state:
             df_to_save = st.session_state.auto_evaled_df.rename(
@@ -381,7 +457,14 @@ def send_for_sme_evaluation():
 def iterate_on_specific_question(
     filtered_df: pd.DataFrame, row_index: int, baseline_prompt: str
 ):
-    """Allow user to iterate on a specific question with an improved UI."""
+    """
+    Allow user to iterate on a specific question with an improved UI.
+
+    Args:
+        filtered_df (pd.DataFrame): Dataframe containing the selected question.
+        row_index (int): Index of the selected row.
+        baseline_prompt (str): Initial baseline prompt.
+    """
     st.subheader("🔍 Iterate on Specific Question")
 
     row = filtered_df.iloc[0]
@@ -409,14 +492,16 @@ def iterate_on_specific_question(
     if sme_feedback:
         st.markdown(f"#### **SME Feedback:**\n{sme_feedback}")
 
-    model = st.selectbox(
-        "Select Model",
-        ["gpt-4o", "gpt-4o-2024-08-06", "gpt-4-turbo-preview"],
-        key="model_select_specific",
-    )
-    modified_prompt = st.text_area(
-        "Modified Prompt", value=baseline_prompt, height=600, key="prompt_specific"
-    )
+    modified_prompt, model = display_prompt_dev_box(baseline_prompt, row)
+
+    # model = st.selectbox(
+    #     "Select Model",
+    #     ["gpt-4o", "gpt-4o-2024-08-06", "gpt-4-turbo-preview"],
+    #     key="model_select_specific",
+    # )
+    # modified_prompt = st.text_area(
+    #     "Modified Prompt", value=baseline_prompt, height=600, key="prompt_specific"
+    # )
 
     # Generate new response
     if st.button("Generate New Response", key="generate_specific"):
@@ -451,7 +536,9 @@ def iterate_on_specific_question(
 
 
 def main():
-    """Main function to run the Streamlit app."""
+    """
+    Main function to run the Streamlit app for prompt iteration.
+    """
     setup_page()
     setup_logging()
     df = load_data()
