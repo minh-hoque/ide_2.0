@@ -162,7 +162,14 @@ def auto_evaluate_responses(df: pd.DataFrame) -> pd.DataFrame:
         response = query_structured_gpt4(prompt)
         logger.debug(f"LLM Response:\n{response}")
         logger.info(f"Auto Evaluation: {response.result}")
-        return {"auto_evaluation": response.result, "rationale": response.rationale}
+
+        # Add SME feedback to the beginning of the rationale if available
+        rationale = (
+            f"SME Feedback: {row['sme_feedback']}\n\n" if row["sme_feedback"] else ""
+        )
+        rationale += response.rationale
+
+        return {"auto_evaluation": response.result, "rationale": rationale}
 
     results = []
     for index, row in df.iterrows():
