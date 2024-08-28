@@ -369,6 +369,8 @@ def display_preview_results(auto_evaled_df: pd.DataFrame) -> None:
     """
     st.write("Responses generated with the modified prompt:")
 
+    # Add legend
+
     auto_evaled_df["row_color"] = "white"
     auto_evaled_df.loc[
         (auto_evaled_df["old_auto_evaluation"] == "REJECT")
@@ -411,13 +413,6 @@ def display_preview_results(auto_evaled_df: pd.DataFrame) -> None:
     def highlight_row_of_df(row):
         return ["background-color: " + row["row_color"]] * len(row)
 
-    # def handle_row_selection():
-    #     if selection:
-    #         selected_index = selection["rows"][0]
-    #         st.session_state.selected_row_index = selected_index
-    #         st.session_state.filtered_df = auto_evaled_df.iloc[[selected_index]]
-    #         st.rerun()
-
     selection = st.dataframe(
         display_df.style.apply(highlight_row_of_df, axis=1),
         column_config=column_config,
@@ -430,8 +425,20 @@ def display_preview_results(auto_evaled_df: pd.DataFrame) -> None:
             "auto_evaluation",
             "rationale",
         ],
-        # on_select=handle_row_selection,
-        # selection_mode="single-row",
+    )
+    st.markdown(
+        """
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+        <span style="margin-right: 10px;">Row Highlighting Legend:</span>
+        <div style="margin-right: 20px;">
+            <span style="background-color: lightgreen; padding: 2px 5px;">■</span> Improvement (REJECT → ACCEPT)
+        </div>
+        <div>
+            <span style="background-color: lightcoral; padding: 2px 5px;">■</span> Regression (ACCEPT → REJECT)
+        </div>
+    </div>
+    """,
+        unsafe_allow_html=True,
     )
 
 
