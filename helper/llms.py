@@ -152,10 +152,14 @@ def auto_evaluate_responses(df):
         auto_evaluate_response = query_structured_gpt4(formated_prompt)
         logger.debug(f"LLM Response:\n{auto_evaluate_response}")
 
-        rational = auto_evaluate_response.rationale
+        rationale = (
+            f"SME Feedback: {row['sme_feedback']}\n\n" if row["sme_feedback"] else ""
+        )
+        rationale += auto_evaluate_response.rationale
+
         auto_evaluation = auto_evaluate_response.result
 
-        rational_list.append(rational)
+        rational_list.append(rationale)
         auto_evaluation_results.append(auto_evaluation)
         logger.debug(f"Old Response:\n{row['response']}")
         logger.debug(f"New Response:\n{row['new_response']}")
