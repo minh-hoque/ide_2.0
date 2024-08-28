@@ -50,7 +50,7 @@ def load_data() -> pd.DataFrame:
     eval_files = [
         f
         for f in os.listdir("./storage/manual_annotations")
-        if f.startswith("evaluated_responses") and f.endswith(".csv")
+        if f.endswith("evaluated.csv")
     ]
 
     if not eval_files:
@@ -411,7 +411,14 @@ def display_preview_results(auto_evaled_df: pd.DataFrame) -> None:
     def highlight_row_of_df(row):
         return ["background-color: " + row["row_color"]] * len(row)
 
-    st.dataframe(
+    # def handle_row_selection():
+    #     if selection:
+    #         selected_index = selection["rows"][0]
+    #         st.session_state.selected_row_index = selected_index
+    #         st.session_state.filtered_df = auto_evaled_df.iloc[[selected_index]]
+    #         st.rerun()
+
+    selection = st.dataframe(
         display_df.style.apply(highlight_row_of_df, axis=1),
         column_config=column_config,
         hide_index=True,
@@ -423,6 +430,8 @@ def display_preview_results(auto_evaled_df: pd.DataFrame) -> None:
             "auto_evaluation",
             "rationale",
         ],
+        # on_select=handle_row_selection,
+        # selection_mode="single-row",
     )
 
 

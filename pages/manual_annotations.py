@@ -3,6 +3,7 @@ import pandas as pd
 from css.style import apply_snorkel_style
 from helper.logging import get_logger
 from typing import Tuple
+import os
 
 logger = get_logger(__name__)
 
@@ -114,17 +115,20 @@ def update_annotation(
     return df
 
 
-def save_annotations(df: pd.DataFrame):
+def save_annotations(df: pd.DataFrame, original_filename: str):
     """
     Save the annotated DataFrame to a CSV file.
 
     Args:
         df (pd.DataFrame): The DataFrame containing all annotations.
+        original_filename (str): The name of the original uploaded file.
     """
     if st.button("Submit Annotations"):
-        output_path = "./storage/manual_annotations/evaluated_responses_2.csv"
+        filename, ext = os.path.splitext(original_filename)
+        output_filename = f"{filename}_evaluated{ext}"
+        output_path = os.path.join("./storage/manual_annotations", output_filename)
         df.to_csv(output_path, index=False)
-        st.success("Annotations submitted successfully!")
+        st.success(f"Annotations submitted successfully! Saved as {output_filename}")
 
 
 def display_and_rate_response(
@@ -187,7 +191,7 @@ def process_annotations(uploaded_file):
 
         st.markdown("<hr>", unsafe_allow_html=True)
 
-    save_annotations(df)
+    save_annotations(df, uploaded_file.name)
 
 
 def main():
