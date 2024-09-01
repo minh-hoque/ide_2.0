@@ -121,15 +121,31 @@ def display_evaluated_responses(df: pd.DataFrame) -> None:
     }
 
     if st.session_state.get("selected_row_index", -1) >= 0:
+        displayed_columns = [
+            "question",
+            "response",
+            "rating",
+            "edited_gt",
+            "sme_feedback",
+        ]
+        filtered_df = st.session_state.filtered_df[displayed_columns]
         st.dataframe(
-            st.session_state.filtered_df,
+            filtered_df,
             column_config=column_config,
             use_container_width=True,
             hide_index=True,
         )
     else:
+        displayed_columns = [
+            "question",
+            "response",
+            "rating",
+            "edited_gt",
+            "sme_feedback",
+        ]
+        filtered_df = df[displayed_columns]
         selection = st.dataframe(
-            df,
+            filtered_df,
             column_config=column_config,
             use_container_width=True,
             hide_index=True,
@@ -145,20 +161,47 @@ def display_evaluated_responses(df: pd.DataFrame) -> None:
             st.rerun()
 
 
-@st.cache_data
-def load_baseline_prompt() -> str:
+def load_saved_prompts():
+    """Load the list of saved prompts from the storage directory."""
+    prompts_dir = "./storage/prompts"
+    if not os.path.exists(prompts_dir):
+        return []
+
+    prompt_files = [f for f in os.listdir(prompts_dir) if f.endswith(".txt")]
+    prompt_files.sort(reverse=True)  # Sort files in reverse order (newest first)
+    return prompt_files
+
+
+def load_prompt() -> str:
     """
-    Load the baseline prompt from file or use default if not found.
+    Load the baseline prompt from file, saved prompt, or use default if not found.
 
     Returns:
         str: Baseline prompt text.
     """
-    try:
-        with open("./storage/baseline_prompt.txt", "r") as f:
-            return f.read()
-    except FileNotFoundError:
-        logger.warning("No baseline prompt found. Using default prompt.")
-        return PROMPT_4
+    st.sidebar.markdown("## Load Saved Prompt")
+    saved_prompts = load_saved_prompts()
+    selected_prompt = st.sidebar.selectbox(
+        "Select a saved prompt:", ["Current Baseline"] + saved_prompts, index=0
+    )
+
+    if selected_prompt == "Current Baseline":
+        try:
+            with open("./storage/baseline_prompt.txt", "r") as f:
+                return f.read()
+        except FileNotFoundError:
+            logger.warning("No baseline prompt found. Using default prompt.")
+            return PROMPT_4
+    else:
+        try:
+            with open(os.path.join("./storage/prompts", selected_prompt), "r") as f:
+                return f.read()
+        except FileNotFoundError:
+            logger.error(f"Selected prompt file {selected_prompt} not found.")
+            st.sidebar.error(
+                f"Selected prompt file {selected_prompt} not found. Using default prompt."
+            )
+            return PROMPT_4
 
 
 def display_prompt_dev_box(baseline_prompt: str, df: pd.DataFrame) -> Tuple[str, str]:
@@ -347,6 +390,7 @@ def generate_new_responses(
     total_rows = len(df)
 
     for index, row in df.iterrows():
+        logger.info("=" * 10)
         logger.info(f"Inference index {index}")
         question = row["question"]
         formatted_prompt = modified_prompt.format(user_question=question)
@@ -600,7 +644,7 @@ def main() -> None:
     setup_logging()
     df = load_data()
     display_evaluated_responses(df)
-    baseline_prompt = load_baseline_prompt()
+    baseline_prompt = load_prompt()
 
     if st.session_state.get("selected_row_index", -1) >= 0:
         iterate_on_specific_question(
