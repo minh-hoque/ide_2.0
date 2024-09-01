@@ -11,7 +11,7 @@ from streamlit.delta_generator import DeltaGenerator
 from css.style import apply_snorkel_style
 from helper.llms import query_gpt4, auto_evaluate_responses
 from helper.logging import get_logger
-from prompts.base_prompts import PROMPT_4
+from prompts.base_prompts import BASELINE_PROMPT
 
 # Load environment variables and set up OpenAI client
 load_dotenv()
@@ -191,7 +191,7 @@ def load_prompt() -> str:
                 return f.read()
         except FileNotFoundError:
             logger.warning("No baseline prompt found. Using default prompt.")
-            return PROMPT_4
+            return BASELINE_PROMPT
     else:
         try:
             with open(os.path.join("./storage/prompts", selected_prompt), "r") as f:
@@ -201,7 +201,7 @@ def load_prompt() -> str:
             st.sidebar.error(
                 f"Selected prompt file {selected_prompt} not found. Using default prompt."
             )
-            return PROMPT_4
+            return BASELINE_PROMPT
 
 
 def display_prompt_dev_box(baseline_prompt: str, df: pd.DataFrame) -> Tuple[str, str]:

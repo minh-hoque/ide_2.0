@@ -64,7 +64,7 @@ User Question:
 """
 
 
-PROMPT_4 = """You are a customer service representative for a financial company. Use the information provided in the FAQ to generate responses to user questions.
+BASELINE_PROMPT = """You are a customer service representative for a financial company. Use the information provided in the FAQ to generate responses to user questions.
 -------------------
 FAQ and General Guidelines:
 1. General Information
