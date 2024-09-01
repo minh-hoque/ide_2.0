@@ -1,4 +1,6 @@
 import os
+import json
+from datetime import datetime
 from typing import Tuple, Dict, List, Optional
 import pandas as pd
 import streamlit as st
@@ -426,6 +428,7 @@ def display_preview_results(auto_evaled_df: pd.DataFrame) -> None:
             "rationale",
         ],
     )
+    # Add a legend to explain the row highlighting colors
     st.markdown(
         """
     <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
@@ -440,12 +443,24 @@ def display_preview_results(auto_evaled_df: pd.DataFrame) -> None:
     """,
         unsafe_allow_html=True,
     )
+    # The legend is displayed as HTML for better formatting
+    # It shows two colored boxes with explanations:
+    # - Light green for improvements (responses that changed from REJECT to ACCEPT)
+    # - Light coral for regressions (responses that changed from ACCEPT to REJECT)
+    # This helps users quickly understand the meaning of the row colors in the dataframe
 
 
-def send_for_sme_evaluation() -> None:
-    """Save the generated responses for SME evaluation."""
-    if st.button("Send for SME Evaluation"):
-        if "auto_evaled_df" in st.session_state:
+def save_prompt_and_responses() -> None:
+    """Save the latest prompt and generated responses for SME evaluation."""
+    if st.button("Save Prompt"):
+        if (
+            "auto_evaled_df" in st.session_state
+            and "modified_prompt" in st.session_state
+        ):
+            # Generate a unique identifier for this save operation
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+
+            # Save the responses
             df_to_save = st.session_state.auto_evaled_df.rename(
                 columns={
                     "response": "old_response",
@@ -453,19 +468,52 @@ def send_for_sme_evaluation() -> None:
                     "rating": "old_rating",
                 }
             )
-            try:
-                df_to_save.to_csv(
-                    "./storage/iteration_responses/new_experiment_responses.csv",
-                    index=False,
-                )
-                st.success("Responses saved for SME evaluation!")
-            except Exception as e:
-                st.error(f"Error saving responses: {str(e)}")
-                logger.error(f"Error saving responses: {str(e)}")
-        else:
-            st.error(
-                "No responses to send for SME evaluation. Need to preview prompt first."
+            responses_filename = f"experiment_responses_{timestamp}.csv"
+            responses_path = os.path.join(
+                "./storage/iteration_responses", responses_filename
             )
+
+            # Save the prompt
+            prompt_filename = f"prompt_{timestamp}.txt"
+            prompt_path = os.path.join("./storage/prompts", prompt_filename)
+
+            # Create a mapping entry
+            mapping_entry = {
+                "timestamp": timestamp,
+                "prompt_file": prompt_filename,
+                "responses_file": responses_filename,
+            }
+
+            try:
+                # Save responses
+                os.makedirs(os.path.dirname(responses_path), exist_ok=True)
+                df_to_save.to_csv(responses_path, index=False)
+
+                # Save prompt
+                os.makedirs(os.path.dirname(prompt_path), exist_ok=True)
+                with open(prompt_path, "w") as f:
+                    f.write(st.session_state.modified_prompt)
+
+                # Update the mapping file
+                mapping_file = "./storage/prompt_response_mapping.json"
+                if os.path.exists(mapping_file):
+                    with open(mapping_file, "r") as f:
+                        mapping = json.load(f)
+                else:
+                    mapping = []
+
+                mapping.append(mapping_entry)
+
+                with open(mapping_file, "w") as f:
+                    json.dump(mapping, f, indent=2)
+
+                st.success("Prompt and responses saved successfully!")
+                logger.info(f"Saved prompt and responses with timestamp {timestamp}")
+            except Exception as e:
+                st.error(f"Error saving prompt and responses: {str(e)}")
+                logger.error(f"Error saving prompt and responses: {str(e)}")
+        else:
+            st.error("No responses to save. Please preview the prompt first.")
 
 
 def iterate_on_specific_question(
@@ -562,8 +610,11 @@ def main() -> None:
         )
     else:
         modified_prompt, model = display_prompt_dev_box(baseline_prompt, df)
+        st.session_state.modified_prompt = (
+            modified_prompt  # Store the modified prompt in session state
+        )
         preview_prompt(df, modified_prompt, model)
-        send_for_sme_evaluation()
+        save_prompt_and_responses()  # Replace send_for_sme_evaluation with this new function
 
 
 if __name__ == "__main__":
