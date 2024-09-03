@@ -36,6 +36,11 @@ class AutoEvaluationResult(BaseModel):
     result: str
 
 
+# Data Class for Extraction Result from LLM
+class ExtractionResult(BaseModel):
+    extraction: Dict[str, List[str]]
+
+
 # GPT-4 query functions
 @retry(
     wait=wait_random_exponential(min=1, max=60),
@@ -76,7 +81,9 @@ def query_gpt4(prompt, system_prompt="", model="gpt-4o", json_response=False):
     ),
 )
 @st.cache_resource
-def query_structured_gpt4(prompt, system_prompt="", model="gpt-4o-2024-08-06"):
+def query_structured_gpt4(
+    prompt, system_prompt="", model="gpt-4o-2024-08-06", response_format=None
+):
     try:
         messages = [{"role": "user", "content": prompt}]
         if system_prompt:
@@ -86,7 +93,7 @@ def query_structured_gpt4(prompt, system_prompt="", model="gpt-4o-2024-08-06"):
             model=model,
             messages=messages,
             temperature=0,
-            response_format=AutoEvaluationResult,
+            response_format=response_format,
         )
         logger.info(
             "Structured GPT-4 Response: \n%s", response.choices[0].message.parsed
@@ -149,7 +156,9 @@ def auto_evaluate_responses(df):
             logger.info("Auto Evaluation: N/A")
             continue
 
-        auto_evaluate_response = query_structured_gpt4(formated_prompt)
+        auto_evaluate_response = query_structured_gpt4(
+            formated_prompt, response_format=AutoEvaluationResult
+        )
         logger.debug(f"LLM Response:\n{auto_evaluate_response}")
 
         rationale = (

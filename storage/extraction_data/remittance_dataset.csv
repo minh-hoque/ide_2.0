@@ -1,0 +1,69 @@
+filename,text,ground_truth
+Electronic Paym_AC Statement 62104112024 73.pdf,"Statement Date :04/11/2024
+Status:Paid,CheckBrown & Brown Insurance Services, Inc.
+AC Statement - 4/11/2024QBE Insurance Group Limited04/11/2024 Page 1 of 1 Account Current Statement
+RS - USAgent Code:  1239698402
+300 North Beach Street
+Daytona Beach, FL  321142550 Wasser Terrace Ste 6000
+Herndon, VA  20171
+Pay Amount Writing Co Eff Date Tran Rate Agency Comm Previously Paid Insured Name Policy Net Payable LOB/Chg Agency Gross
+Philip Morris International Inc. 130000116 BP2739 03/28/2024 RWL 41,707.00 41,707.00 0.00 0.00 FIDUC 41,707.00 0.00
+Recology Inc. 100045066 012562 03/05/2024 RWL 463,250.00 463,250.00 0.00 81,750.00 MGMT 545,000.00 15.00
+586,707.00 81,750.00 504,957.00 0.00 504,957.00 Totals","{""policy_number"": [""130000116"", ""100045066""], ""named_insured"": [""Philip Morris International Inc."", ""Recology Inc.""], ""effective_date"": [""03/28/2024"", ""03/05/2024""]}"
+Wirebackup from_PEN wtw of ne_QBE Insurance Corporation_28707-88_R-no 51834_28707-88_ACH EFF 04232024.pdf,"Agency Name
+Agency Code PEN
+Entity Name
+Statement #
+Check ID # 51834
+PEN 28708
+Account NamePolicy 
+TypePolicy NumberAccounting 
+MonthItem NumberEffective 
+Date Code Gross 
+Amount Comm %  Comm Amt  Paid Receivable 
+Balance
+A&H Sportswear Company, Inc.
+CGL 171000623 202404            
+220650417/1/2023RENB  $      3,667.00 17.5000%  $         641.68  $    3,025.32 0
+A&H Sportswear Company, Inc.
+WORK 152000151 202404            
+220651767/1/2023RENB  $      1,820.00 10.0000%  $         182.00  $    1,638.00 0
+A&H Sportswear Company, Inc.
+WORK 152000155 202404            
+220652157/1/2023RENB  $      5,796.00 10.0000%  $         579.60  $    5,216.40 0
+A&H Sportswear Company, Inc.
+WORK 152000159 202404            
+220652847/1/2023RENB  $      2,899.00 10.0000%  $         289.90  $    2,609.10 0
+A&H Sportswear Company, Inc.
+WORK 152000166 202404            
+220653277/1/2023RENB  $         177.00 10.0000%  $           17.70  $       159.30 0
+A&H Sportswear Company, Inc.
+PROP CFE1383623 202404            
+221616007/1/2023RENB  $    14,480.00 17.5000%  $      2,534.00  $  11,946.00 0
+A&H Sportswear Company, Inc.
+BAUT 161000196 202404            
+221752567/1/2023RENB  $      4,986.40 FLAT  $         872.64  $    4,113.76 0 $                  28,707.88 
+2618404 - 2126482
+28707-88wtw of ne
+QBE Insurance Corporation
+2126482Payee Name
+Description ACH EFF 04232024Voucher Amount
+Master Statement#
+Routing InfoQBE Insurance Corporation","{""policy_number"": [""171000623"", ""152000151"", ""152000155"", ""152000159"", ""152000166"", ""CFE1383623"", ""161000196""], ""named_insured"": [""A&H Sportswear Company, Inc."", ""A&H Sportswear Company, Inc."", ""A&H Sportswear Company, Inc."", ""A&H Sportswear Company, Inc."", ""A&H Sportswear Company, Inc."", ""A&H Sportswear Company, Inc."", ""A&H Sportswear Company, Inc.""], ""effective_date"": [""7/1/2023"", ""7/1/2023"", ""7/1/2023"", ""7/1/2023"", ""7/1/2023"", ""7/1/2023"", ""7/1/2023""]}"
+H0075_ACH_4_23__remit_4_23_2024_638494767365082088.pdf,"*****Remittance Advice*****
+CRC Group
+PO Box 95236
+Grapevine, TX 76099 - 9752
+Payee / Market Check Nbr. Date Amount
+H0075/ 11593675 ACH202404231222 4/23/2024 $4760.00
+ 
+Policy Eff. Insured TransCode InvNo GrossPremium Comm % Comm Amt Amt Pd
+130006441 1/25/2024Breaking 
+Ground 
+Productions, 
+LLCADD 6070652 $2375.00 20.00 $475.00 $1900.00
+130006441 3/13/2024Breaking 
+Ground 
+Productions, 
+LLCADD 6070591 $3575.00 20.00 $715.00 $2860.00
+Total Amount      $4760.00","{""policy_number"": [""130006441"", ""130006441""], ""named_insured"": [""Breaking Ground Productions, LLC"", ""Breaking Ground Productions, LLC""], ""effective_date"": [""1/25/2024"", ""3/13/2024""]}"
