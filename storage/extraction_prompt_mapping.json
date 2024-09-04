@@ -1,0 +1,38 @@
+[
+  {
+    "timestamp": "20240903_1429",
+    "prompt_file": "extraction_prompt_20240903_1429.txt",
+    "extractions_file": "experiment_extractions_20240903_1429.csv",
+    "metrics": {
+      "entity_metrics": {
+        "policy_number": {
+          "tp": 10,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "named_insured": {
+          "tp": 4,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "effective_date": {
+          "tp": 5,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        }
+      },
+      "avg_precision": 1.0,
+      "avg_recall": 1.0,
+      "avg_f1": 1.0
+    }
+  }
+]

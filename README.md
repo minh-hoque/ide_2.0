@@ -1,6 +1,6 @@
 # Prompt Development Workflow
 
-This project implements a Streamlit-based application for iterative prompt development and evaluation in AI-powered question-answering systems. It allows users to load evaluated responses, modify prompts, preview new responses, and send them for Subject Matter Expert (SME) evaluation.
+This project implements a Streamlit-based application for iterative prompt development and evaluation in AI-powered question-answering and entity extraction systems. It allows users to load evaluated responses, modify prompts, preview new responses, and send them for Subject Matter Expert (SME) evaluation.
 
 ## Features
 
@@ -9,8 +9,9 @@ This project implements a Streamlit-based application for iterative prompt devel
 - Preview new responses using selected AI models (GPT-4 variants)
 - Auto-evaluate generated responses against original responses or SME feedback
 - Calculate and display evaluation metrics (acceptance rate, improvements, regressions)
-- Send responses for SME evaluation
+- Save prompts and responses for further iteration
 - Iterate on specific questions for focused improvement
+- Entity extraction prompt development and evaluation
 - Customizable logging levels for debugging and monitoring
 - Stylish UI with custom CSS
 
@@ -49,18 +50,24 @@ This project implements a Streamlit-based application for iterative prompt devel
 
 - `main.py`: Main entry point for the Streamlit application
 - `pages/`:
-  - `prompt_iteration.py`: Prompt development and iteration page
+  - `prompt_iteration.py`: Prompt development and iteration page for Q&A
+  - `prompt_iteration_extraction.py`: Prompt development and iteration page for entity extraction
   - `manual_annotations.py`: Page for manual annotation of responses
 - `css/style.py`: Custom CSS styles for improved UI
 - `helper/`:
   - `llms.py`: Functions for interacting with language models
   - `logging.py`: Custom logging setup
 - `prompts/`:
-  - `base_prompts.py`: Default prompts for the system
+  - `base_prompts.py`: Default prompts for the Q&A system
+  - `extraction_prompts.py`: Default prompts for the entity extraction system
   - `auto_evaluation_prompts.py`: Prompts for auto-evaluation
 - `storage/`:
   - `manual_annotations/`: Directory for storing manually annotated responses
-  - `iteration_responses/`: Directory for storing responses from iteration
+  - `iteration_responses/`: Directory for storing responses from Q&A iteration
+  - `extraction_data/`: Directory for storing entity extraction datasets
+  - `extraction_results/`: Directory for storing entity extraction results
+  - `prompts/`: Directory for storing saved prompts
+  - `extraction_prompts/`: Directory for storing saved extraction prompts
 
 ## Running the Application
 
@@ -76,7 +83,8 @@ To run the full application with all pages:
 3. Open your web browser and navigate to the URL displayed in the terminal (usually `http://localhost:8501`).
 
 4. Use the sidebar to navigate between different pages:
-   - Prompt Iteration
+   - Prompt Iteration (Q&A)
+   - Extraction Prompt Iteration
    - Manual Annotation
 
 ## Usage Guide
@@ -88,13 +96,21 @@ To run the full application with all pages:
 3. Provide feedback and edited ground truth for rejected responses.
 4. Submit annotations to save them for further processing.
 
-### Prompt Iteration Page
+### Prompt Iteration Page (Q&A)
 
 1. **Load Data**: Select an evaluated responses file from the dropdown menu.
 2. **Modify Prompt**: Use the "Prompt Dev Box" to modify the baseline prompt. View SME feedback to guide your modifications.
 3. **Preview Responses**: Click "Preview Prompt" to generate new responses using the modified prompt. The system will auto-evaluate these responses and display metrics.
 4. **Iterate on Specific Questions**: Click on a specific row in the evaluated responses table to focus on improving that particular question-answer pair.
-5. **Send for SME Evaluation**: After previewing and iterating, send the new responses for SME evaluation.
+5. **Save Prompt and Responses**: After previewing and iterating, save the new prompt and responses for further evaluation.
+
+### Extraction Prompt Iteration Page
+
+1. **Load Data**: Select an entity extraction dataset file from the dropdown menu.
+2. **Modify Prompt**: Use the "Prompt Dev Box" to modify the baseline extraction prompt.
+3. **Preview Extractions**: Click "Preview Prompt" to generate new extractions using the modified prompt. The system will evaluate these extractions and display metrics.
+4. **View Individual Examples**: Expand individual examples to see detailed extraction results and entity-level metrics.
+5. **Save Prompt and Extractions**: After previewing and iterating, save the new prompt and extractions for further evaluation.
 
 ## Key Components
 
@@ -108,9 +124,9 @@ To run the full application with all pages:
 
 - Custom colored logging setup for better debugging and monitoring.
 
-### Prompts (`prompts/auto_evaluation_prompts.py`)
+### Prompts (`prompts/auto_evaluation_prompts.py`, `prompts/extraction_prompts.py`)
 
-- Contains prompts for auto-evaluation of responses, including equivalence checking and SME feedback incorporation.
+- Contains prompts for auto-evaluation of responses and entity extraction tasks.
 
 ### UI Styling (`css/style.py`)
 
@@ -118,7 +134,7 @@ To run the full application with all pages:
 
 ## Contributing
 
-Contributions to this project are welcome :)!
+Contributions to this project are welcome! Please feel free to submit issues, fork the repository and send pull requests!
 
 ## License
 
