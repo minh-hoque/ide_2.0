@@ -52,7 +52,7 @@ def load_data() -> pd.DataFrame:
 
     try:
         df = pd.read_csv(os.path.join("./storage/extraction_data", selected_file))
-        # df["ground_truth"] = df["ground_truth"].apply(json.loads)
+        st.session_state.df = df  # Store df in session state
         return df
     except Exception as e:
         logger.error(f"Error loading file {selected_file}: {str(e)}")
@@ -316,11 +316,15 @@ def display_preview_results(df: pd.DataFrame, extractions: List[Dict]) -> None:
 def save_prompt_and_extractions() -> None:
     """Save the latest prompt and generated extractions."""
     if st.button("Save Prompt"):
-        if "extractions" in st.session_state and "modified_prompt" in st.session_state:
+        if (
+            "extractions" in st.session_state
+            and "modified_prompt" in st.session_state
+            and "df" in st.session_state
+        ):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M")
 
-            # Save the extractions
-            extractions_filename = f"experiment_extractions_{timestamp}.json"
+            # Save the extractions as CSV
+            extractions_filename = f"experiment_extractions_{timestamp}.csv"
             extractions_path = os.path.join(
                 "./storage/extraction_results", extractions_filename
             )
@@ -338,10 +342,13 @@ def save_prompt_and_extractions() -> None:
             }
 
             try:
-                # Save extractions
+                # Combine original DataFrame with extractions
+                combined_df = st.session_state.df.copy()
+                combined_df["extractions"] = st.session_state.extractions
+
+                # Save extractions as CSV
                 os.makedirs(os.path.dirname(extractions_path), exist_ok=True)
-                with open(extractions_path, "w") as f:
-                    json.dump(st.session_state.extractions, f, indent=2)
+                combined_df.to_csv(extractions_path, index=False)
 
                 # Save prompt
                 os.makedirs(os.path.dirname(prompt_path), exist_ok=True)
@@ -367,7 +374,7 @@ def save_prompt_and_extractions() -> None:
                 st.error(f"Error saving prompt and extractions: {str(e)}")
                 logger.error(f"Error saving prompt and extractions: {str(e)}")
         else:
-            st.error("No extractions to save. Please preview the prompt first.")
+            st.error("No extractions or data to save. Please preview the prompt first.")
 
 
 def display_evaluated_extractions(df: pd.DataFrame) -> None:
