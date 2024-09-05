@@ -2,6 +2,8 @@
 
 This project implements a Streamlit-based application for iterative prompt development and evaluation in AI-powered question-answering and entity extraction systems. It allows users to load evaluated responses, modify prompts, preview new responses, and send them for Subject Matter Expert (SME) evaluation.
 
+The workflow is designed to scale SME expertise and allow data scientists to quickly iterate and develop prompts for their AI systems.
+
 ## Features
 
 - Load and display evaluated responses from CSV files
