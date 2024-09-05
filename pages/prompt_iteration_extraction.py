@@ -145,11 +145,15 @@ def generate_extractions(
         text = row["text"]
         formatted_prompt = modified_prompt.format(text=text)
         extraction_response = query_gpt4(formatted_prompt)
+
         print("extraction_response")
         print(extraction_response, type(extraction_response))
+
         parsed_extraction = parse_gpt4_output(extraction_response)
+
         print("parsed_extraction")
         print(parsed_extraction, type(parsed_extraction))
+
         extractions.append(parsed_extraction)
 
         progress = float(index + 1) / float(total_rows)
@@ -249,6 +253,27 @@ def calculate_metrics(
         "avg_recall": avg_recall,
         "avg_f1": avg_f1,
     }
+
+
+def format_metrics_markdown(precision: float, recall: float, f1: float) -> str:
+    """
+    Format precision, recall, and F1 score as a markdown table.
+
+    Args:
+        precision (float): The precision score.
+        recall (float): The recall score.
+        f1 (float): The F1 score.
+
+    Returns:
+        str: A markdown-formatted string representing the metrics table.
+    """
+    return f"""
+| Metric    | Score |
+|-----------|-------|
+| Precision | {precision:.2f} |
+| Recall    | {recall:.2f} |
+| F1 Score  | {f1:.2f} |
+"""
 
 
 def display_metrics(metrics: Dict[str, float]) -> None:
@@ -391,8 +416,9 @@ def display_evaluated_extractions(df: pd.DataFrame) -> None:
         "ground_truth": st.column_config.TextColumn("Ground Truth", width="large"),
     }
 
+    displayed_columns = ["filename", "text", "ground_truth"]
+
     if st.session_state.get("selected_row_index", -1) >= 0:
-        displayed_columns = ["filename", "text", "ground_truth"]
         filtered_df = st.session_state.filtered_df[displayed_columns]
         st.dataframe(
             filtered_df,
@@ -401,21 +427,85 @@ def display_evaluated_extractions(df: pd.DataFrame) -> None:
             hide_index=True,
         )
     else:
-        displayed_columns = ["filename", "text", "ground_truth"]
         filtered_df = df[displayed_columns]
         selection = st.dataframe(
             filtered_df,
             column_config=column_config,
             use_container_width=True,
             hide_index=True,
-            on_select=lambda selection: handle_selection(selection, df),
+            on_select="rerun",
+            selection_mode="single-row",
+        )
+        selected_rows = selection.selection.rows
+        if selected_rows:
+            st.session_state.selected_row_index = selected_rows[0]
+            st.session_state.filtered_df = df.iloc[
+                [st.session_state.selected_row_index]
+            ]
+            st.rerun()
+
+
+def iterate_on_specific_datapoint(df: pd.DataFrame, baseline_prompt: str) -> None:
+    """
+    Handle the iteration on a specific datapoint when a row is selected.
+
+    Args:
+        df (pd.DataFrame): The full dataframe containing all extraction data.
+        baseline_prompt (str): The baseline prompt to start with.
+    """
+    selected_row = st.session_state.filtered_df.iloc[0]
+    st.subheader(f"Iterating on: {selected_row['filename']}")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.write("**Original Text:**")
+        st.text(selected_row["text"])
+
+        st.write("**Ground Truth:**")
+        st.json(json.loads(selected_row["ground_truth"]))
+
+    with col2:
+        st.write("**Extraction Prompt:**")
+        iteration_prompt = st.text_area(
+            "Modify the prompt for this specific example:",
+            value=baseline_prompt,
+            height=400,
         )
 
+        if st.button("Run Extraction"):
+            extraction_response = query_gpt4(
+                iteration_prompt.format(text=selected_row["text"])
+            )
+            parsed_extraction = parse_gpt4_output(extraction_response)
 
-def handle_selection(selection, df):
-    if selection:
-        st.session_state.selected_row_index = selection.index[0]
-        st.session_state.filtered_df = df.iloc[[st.session_state.selected_row_index]]
+            st.write("**Extracted Entities:**")
+            st.json(parsed_extraction)
+
+            metrics = calculate_example_metrics(
+                json.loads(selected_row["ground_truth"]), parsed_extraction
+            )
+            st.markdown("#### Metrics")
+            num_columns = 3
+            entities = list(metrics.keys())
+            num_rows = (len(entities) + num_columns - 1) // num_columns
+
+            for i in range(0, len(entities), num_columns):
+                cols = st.columns(num_columns)
+                for j in range(num_columns):
+                    if i + j < len(entities):
+                        entity = entities[i + j]
+                        scores = metrics[entity]
+                        with cols[j]:
+                            st.write(f"**{entity}**")
+                            st.markdown(
+                                format_metrics_markdown(
+                                    scores["precision"], scores["recall"], scores["f1"]
+                                )
+                            )
+
+    if st.button("Back to All Extractions"):
+        st.session_state.selected_row_index = -1
         st.rerun()
 
 
@@ -423,18 +513,21 @@ def main() -> None:
     """Main function to run the Streamlit app for extraction prompt iteration."""
     setup_page()
     df = load_data()
-    display_evaluated_extractions(df)  # Add this line
+    display_evaluated_extractions(df)
     baseline_prompt = load_prompt()
 
-    modified_prompt = display_prompt_dev_box(baseline_prompt)
-    st.session_state.modified_prompt = modified_prompt
+    if st.session_state.get("selected_row_index", -1) >= 0:
+        iterate_on_specific_datapoint(df, baseline_prompt)
+    else:
+        modified_prompt = display_prompt_dev_box(baseline_prompt)
+        st.session_state.modified_prompt = modified_prompt
 
-    model = st.selectbox(
-        "Select a model", ["gpt-4o", "gpt-4o-2024-08-06", "gpt-4-turbo-preview"]
-    )
+        model = st.selectbox(
+            "Select a model", ["gpt-4o", "gpt-4o-2024-08-06", "gpt-4-turbo-preview"]
+        )
 
-    preview_prompt(df, modified_prompt, model)
-    save_prompt_and_extractions()
+        preview_prompt(df, modified_prompt, model)
+        save_prompt_and_extractions()
 
 
 if __name__ == "__main__":
