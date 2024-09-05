@@ -2,17 +2,24 @@ import os
 import json
 import re
 from datetime import datetime
-from typing import Dict, List, Union
+from typing import Dict, List, Any
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 import html
+
 from css.style import apply_snorkel_style
-from helper.llms import query_gpt4, query_structured_gpt4, ExtractionResult
+from helper.llms import query_gpt4
 from helper.logging import get_logger
 from prompts.extraction_prompts import EXTRACT_PROMPT
 
+# Constants
+STORAGE_DIR = "./storage"
+EXTRACTION_DATA_DIR = f"{STORAGE_DIR}/extraction_data"
+EXTRACTION_PROMPTS_DIR = f"{STORAGE_DIR}/extraction_prompts"
+EXTRACTION_RESULTS_DIR = f"{STORAGE_DIR}/extraction_results"
+PROMPT_MAPPING_FILE = f"{STORAGE_DIR}/extraction_prompt_mapping.json"
 
 # Load environment variables and set up OpenAI client
 load_dotenv()
@@ -35,10 +42,16 @@ def setup_page() -> None:
 
 
 def load_data() -> pd.DataFrame:
-    """Load and prepare the dataframe from the CSV file."""
-    csv_files = [
-        f for f in os.listdir("./storage/extraction_data") if f.endswith(".csv")
-    ]
+    """
+    Load and prepare the dataframe from a selected CSV file.
+
+    Returns:
+        pd.DataFrame: The loaded dataframe.
+
+    Raises:
+        SystemExit: If no CSV files are found or no file is selected.
+    """
+    csv_files = [f for f in os.listdir(EXTRACTION_DATA_DIR) if f.endswith(".csv")]
 
     if not csv_files:
         st.error("No CSV files found in the extraction_data directory.")
@@ -51,7 +64,7 @@ def load_data() -> pd.DataFrame:
         st.stop()
 
     try:
-        df = pd.read_csv(os.path.join("./storage/extraction_data", selected_file))
+        df = pd.read_csv(os.path.join(EXTRACTION_DATA_DIR, selected_file))
         st.session_state.df = df  # Store df in session state
         return df
     except Exception as e:
@@ -61,7 +74,12 @@ def load_data() -> pd.DataFrame:
 
 
 def load_prompt() -> str:
-    """Load the baseline prompt from file or use default if not found."""
+    """
+    Load the baseline prompt from file or use default if not found.
+
+    Returns:
+        str: The loaded prompt.
+    """
     st.sidebar.markdown("## Load Saved Prompt")
     saved_prompts = load_saved_prompts()
     selected_prompt = st.sidebar.selectbox(
@@ -72,9 +90,7 @@ def load_prompt() -> str:
         return EXTRACT_PROMPT
     else:
         try:
-            with open(
-                os.path.join("./storage/extraction_prompts", selected_prompt), "r"
-            ) as f:
+            with open(os.path.join(EXTRACTION_PROMPTS_DIR, selected_prompt), "r") as f:
                 return f.read()
         except FileNotFoundError:
             logger.error(f"Selected prompt file {selected_prompt} not found.")
@@ -84,24 +100,33 @@ def load_prompt() -> str:
             return "Extract the following entities from the text: {entities}\n\nText: {text}\n\nExtracted entities:"
 
 
-def load_saved_prompts():
-    """Load the list of saved prompts from the storage directory."""
-    prompts_dir = "./storage/extraction_prompts"
-    if not os.path.exists(prompts_dir):
+def load_saved_prompts() -> List[str]:
+    """
+    Load the list of saved prompts from the storage directory.
+
+    Returns:
+        List[str]: A list of saved prompt filenames, sorted newest first.
+    """
+    if not os.path.exists(EXTRACTION_PROMPTS_DIR):
         return []
 
-    prompt_files = [f for f in os.listdir(prompts_dir) if f.endswith(".txt")]
-    prompt_files.sort(reverse=True)  # Sort files in reverse order (newest first)
-    return prompt_files
+    prompt_files = [f for f in os.listdir(EXTRACTION_PROMPTS_DIR) if f.endswith(".txt")]
+    return sorted(prompt_files, reverse=True)
 
 
 def display_prompt_dev_box(baseline_prompt: str) -> str:
-    """Display the prompt development box for modifying the baseline prompt."""
+    """
+    Display the prompt development box for modifying the baseline prompt.
+
+    Args:
+        baseline_prompt (str): The initial prompt to display.
+
+    Returns:
+        str: The modified prompt.
+    """
     st.subheader("Prompt Dev Box")
     st.write("Modify the baseline prompt for entity extraction.")
-
-    modified_prompt = st.text_area("Modified Prompt", value=baseline_prompt, height=300)
-    return modified_prompt
+    return st.text_area("Modified Prompt", value=baseline_prompt, height=300)
 
 
 def parse_gpt4_output(output: str) -> Dict[str, List[str]]:
@@ -109,17 +134,13 @@ def parse_gpt4_output(output: str) -> Dict[str, List[str]]:
     Parse the GPT-4 output from a string that may include markdown JSON formatting.
 
     Args:
-        output (str): The output from GPT-4, potentially including markdown formatting.
+        output (str): The raw output from GPT-4.
 
     Returns:
-        Dict[str, List[str]]: A dictionary where keys are entity types and values are lists of extracted entities.
+        Dict[str, List[str]]: A dictionary of parsed entities and their values.
     """
-    # Remove markdown formatting if present
     json_match = re.search(r"```json\s*(.*?)\s*```", output, re.DOTALL)
-    if json_match:
-        json_str = json_match.group(1)
-    else:
-        json_str = output
+    json_str = json_match.group(1) if json_match else output
 
     try:
         parsed_output = json.loads(json_str)
@@ -127,14 +148,23 @@ def parse_gpt4_output(output: str) -> Dict[str, List[str]]:
         logger.error(f"Error parsing GPT-4 output: {output}")
         return {}
 
-    # Ensure all values are lists
     return {k: v if isinstance(v, list) else [v] for k, v in parsed_output.items()}
 
 
 def generate_extractions(
     df: pd.DataFrame, modified_prompt: str, model: str
 ) -> List[Dict[str, List[str]]]:
-    """Generate extractions using the modified prompt."""
+    """
+    Generate extractions using the modified prompt for each row in the dataframe.
+
+    Args:
+        df (pd.DataFrame): The input dataframe containing texts to extract from.
+        modified_prompt (str): The prompt to use for extraction.
+        model (str): The name of the model to use.
+
+    Returns:
+        List[Dict[str, List[str]]]: A list of extraction results.
+    """
     extractions = []
     progress_bar = st.progress(0)
     progress_text = st.empty()
@@ -150,10 +180,6 @@ def generate_extractions(
         print(extraction_response, type(extraction_response))
 
         parsed_extraction = parse_gpt4_output(extraction_response)
-
-        print("parsed_extraction")
-        print(parsed_extraction, type(parsed_extraction))
-
         extractions.append(parsed_extraction)
 
         progress = float(index + 1) / float(total_rows)
@@ -165,59 +191,47 @@ def generate_extractions(
     return extractions
 
 
-def calculate_example_metrics(
-    ground_truth: Dict, extraction: Dict
-) -> Dict[str, Dict[str, float]]:
-    """Calculate metrics for a single example."""
-    entity_metrics = {}
-    for entity, gt_values in ground_truth.items():
-        ext_values = extraction.get(entity, [])
-        tp = len(set(gt_values) & set(ext_values))
-        fp = len(set(ext_values) - set(gt_values))
-        fn = len(set(gt_values) - set(ext_values))
-
-        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-        f1 = (
-            2 * (precision * recall) / (precision + recall)
-            if (precision + recall) > 0
-            else 0
-        )
-
-        entity_metrics[entity] = {"precision": precision, "recall": recall, "f1": f1}
-    return entity_metrics
-
-
 def calculate_metrics(
-    ground_truth: List[Dict], extractions: List[Dict]
-) -> Dict[str, float]:
-    """Calculate metrics for the extractions."""
+    ground_truth: List[Dict[str, Any]], extractions: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Calculate precision, recall, and F1 score for extractions.
+
+    Args:
+        ground_truth (List[Dict[str, Any]]): List of ground truth dictionaries.
+        extractions (List[Dict[str, Any]]): List of extraction dictionaries.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing overall and entity-level metrics.
+    """
     entity_metrics = {}
-    total_precision = 0
-    total_recall = 0
-    total_f1 = 0
-    entity_count = 0
-    # print(ground_truth)
-    # print(type(ground_truth))
+    total_metrics = {"tp": 0, "fp": 0, "fn": 0}
+
     for i, (gt_str, ext) in enumerate(zip(ground_truth, extractions)):
         try:
             gt = json.loads(gt_str)
             for entity, gt_values in gt.items():
                 if entity not in entity_metrics:
                     entity_metrics[entity] = {"tp": 0, "fp": 0, "fn": 0}
-
                 ext_values = ext.get(entity, [])
+                tp = len(set(gt_values) & set(ext_values))
+                fp = len(set(ext_values) - set(gt_values))
+                fn = len(set(gt_values) - set(ext_values))
 
-                entity_metrics[entity]["tp"] += len(set(gt_values) & set(ext_values))
-                entity_metrics[entity]["fp"] += len(set(ext_values) - set(gt_values))
-                entity_metrics[entity]["fn"] += len(set(gt_values) - set(ext_values))
+                entity_metrics[entity]["tp"] += tp
+                entity_metrics[entity]["fp"] += fp
+                entity_metrics[entity]["fn"] += fn
+
+                total_metrics["tp"] += tp
+                total_metrics["fp"] += fp
+                total_metrics["fn"] += fn
         except json.JSONDecodeError as e:
             print(f"Error parsing JSON for entry {i}:")
             print(f"String: {gt_str}")
             print(f"Error: {str(e)}")
             continue
 
-    for entity, metrics in entity_metrics.items():
+    def calculate_prf(metrics):
         precision = (
             metrics["tp"] / (metrics["tp"] + metrics["fp"])
             if (metrics["tp"] + metrics["fp"]) > 0
@@ -233,57 +247,44 @@ def calculate_metrics(
             if (precision + recall) > 0
             else 0
         )
+        return {"precision": precision, "recall": recall, "f1": f1}
 
-        entity_metrics[entity]["precision"] = precision
-        entity_metrics[entity]["recall"] = recall
-        entity_metrics[entity]["f1"] = f1
+    overall_metrics = calculate_prf(total_metrics)
+    for entity in entity_metrics:
+        entity_metrics[entity].update(calculate_prf(entity_metrics[entity]))
 
-        total_precision += precision
-        total_recall += recall
-        total_f1 += f1
-        entity_count += 1
-
-    avg_precision = total_precision / entity_count if entity_count > 0 else 0
-    avg_recall = total_recall / entity_count if entity_count > 0 else 0
-    avg_f1 = total_f1 / entity_count if entity_count > 0 else 0
-
-    return {
-        "entity_metrics": entity_metrics,
-        "avg_precision": avg_precision,
-        "avg_recall": avg_recall,
-        "avg_f1": avg_f1,
-    }
+    return {"overall": overall_metrics, "entity_metrics": entity_metrics}
 
 
-def format_metrics_markdown(precision: float, recall: float, f1: float) -> str:
+def calculate_example_metrics(
+    ground_truth: Dict[str, List[str]], extraction: Dict[str, List[str]]
+) -> Dict[str, Dict[str, float]]:
     """
-    Format precision, recall, and F1 score as a markdown table.
+    Calculate metrics for a single example.
 
     Args:
-        precision (float): The precision score.
-        recall (float): The recall score.
-        f1 (float): The F1 score.
+        ground_truth (Dict[str, List[str]]): The ground truth dictionary.
+        extraction (Dict[str, List[str]]): The extraction dictionary.
 
     Returns:
-        str: A markdown-formatted string representing the metrics table.
+        Dict[str, Dict[str, float]]: A dictionary of metrics for each entity.
     """
-    return f"""
-| Metric    | Score |
-|-----------|-------|
-| Precision | {precision:.2f} |
-| Recall    | {recall:.2f} |
-| F1 Score  | {f1:.2f} |
-"""
+    return calculate_metrics([ground_truth], [extraction])["entity_metrics"]
 
 
-def display_metrics(metrics: Dict[str, float]) -> None:
-    """Display the calculated metrics."""
+def display_metrics(metrics: Dict[str, Any]) -> None:
+    """
+    Display the calculated metrics.
+
+    Args:
+        metrics (Dict[str, Any]): The metrics dictionary.
+    """
     st.subheader("Evaluation Metrics")
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Average Precision", f"{metrics['avg_precision']:.2f}")
-    col2.metric("Average Recall", f"{metrics['avg_recall']:.2f}")
-    col3.metric("Average F1 Score", f"{metrics['avg_f1']:.2f}")
+    col1.metric("Average Precision", f"{metrics['overall']['precision']:.2f}")
+    col2.metric("Average Recall", f"{metrics['overall']['recall']:.2f}")
+    col3.metric("Average F1 Score", f"{metrics['overall']['f1']:.2f}")
 
     with st.expander("Entity-level Metrics"):
         for entity, entity_metrics in metrics["entity_metrics"].items():
@@ -295,7 +296,14 @@ def display_metrics(metrics: Dict[str, float]) -> None:
 
 
 def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str) -> None:
-    """Preview the modified prompt by generating extractions and displaying results."""
+    """
+    Preview the modified prompt by generating extractions and displaying results.
+
+    Args:
+        df (pd.DataFrame): The input dataframe.
+        modified_prompt (str): The modified prompt.
+        model (str): The name of the model to use.
+    """
     if st.button("Preview Prompt"):
         extractions = generate_extractions(df, modified_prompt, model)
         metrics = calculate_metrics(df["ground_truth"].tolist(), extractions)
@@ -306,13 +314,19 @@ def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str) -> None:
 
 
 def display_preview_results(df: pd.DataFrame, extractions: List[Dict]) -> None:
-    """Display the results of the preview."""
+    """
+    Display the results of the preview.
+
+    Args:
+        df (pd.DataFrame): The input dataframe.
+        extractions (List[Dict]): The list of extraction results.
+    """
     st.write("Extractions generated with the modified prompt:")
 
     for i, (_, row) in enumerate(df.iterrows()):
         with st.expander(f"Example {i+1}"):
-            ground_truth = json.loads(row["ground_truth"])
-
+            # ground_truth = json.loads(row["ground_truth"])
+            ground_truth = row["ground_truth"]
             metrics = calculate_example_metrics(ground_truth, extractions[i])
             st.markdown("### Entity Metrics")
             table_rows = [
@@ -351,12 +365,12 @@ def save_prompt_and_extractions() -> None:
             # Save the extractions as CSV
             extractions_filename = f"experiment_extractions_{timestamp}.csv"
             extractions_path = os.path.join(
-                "./storage/extraction_results", extractions_filename
+                EXTRACTION_RESULTS_DIR, extractions_filename
             )
 
             # Save the prompt
             prompt_filename = f"extraction_prompt_{timestamp}.txt"
-            prompt_path = os.path.join("./storage/extraction_prompts", prompt_filename)
+            prompt_path = os.path.join(EXTRACTION_PROMPTS_DIR, prompt_filename)
 
             # Create a mapping entry
             mapping_entry = {
@@ -381,16 +395,15 @@ def save_prompt_and_extractions() -> None:
                     f.write(st.session_state.modified_prompt)
 
                 # Update the mapping file
-                mapping_file = "./storage/extraction_prompt_mapping.json"
-                if os.path.exists(mapping_file):
-                    with open(mapping_file, "r") as f:
+                if os.path.exists(PROMPT_MAPPING_FILE):
+                    with open(PROMPT_MAPPING_FILE, "r") as f:
                         mapping = json.load(f)
                 else:
                     mapping = []
 
                 mapping.append(mapping_entry)
 
-                with open(mapping_file, "w") as f:
+                with open(PROMPT_MAPPING_FILE, "w") as f:
                     json.dump(mapping, f, indent=2)
 
                 st.success("Prompt and extractions saved successfully!")
@@ -407,7 +420,7 @@ def display_evaluated_extractions(df: pd.DataFrame) -> None:
     Display the extractions in a dataframe and handle row selection.
 
     Args:
-        df (pd.DataFrame): Dataframe containing extractions and ground truth.
+        df (pd.DataFrame): The input dataframe.
     """
     st.subheader("Extraction Data")
     column_config = {
@@ -445,13 +458,34 @@ def display_evaluated_extractions(df: pd.DataFrame) -> None:
             st.rerun()
 
 
+def format_metrics_markdown(precision: float, recall: float, f1: float) -> str:
+    """
+    Format precision, recall, and F1 score as a markdown table.
+
+    Args:
+        precision (float): The precision score.
+        recall (float): The recall score.
+        f1 (float): The F1 score.
+
+    Returns:
+        str: A markdown-formatted string representing the metrics table.
+    """
+    return f"""
+| Metric    | Score |
+|-----------|-------|
+| Precision | {precision:.2f} |
+| Recall    | {recall:.2f} |
+| F1 Score  | {f1:.2f} |
+"""
+
+
 def iterate_on_specific_datapoint(df: pd.DataFrame, baseline_prompt: str) -> None:
     """
     Handle the iteration on a specific datapoint when a row is selected.
 
     Args:
-        df (pd.DataFrame): The full dataframe containing all extraction data.
-        baseline_prompt (str): The baseline prompt to start with.
+        df (pd.DataFrame): The input dataframe.
+        baseline_prompt (str): The baseline prompt.
     """
     selected_row = st.session_state.filtered_df.iloc[0]
     st.subheader(f"Iterating on: {selected_row['filename']}")
@@ -483,7 +517,7 @@ def iterate_on_specific_datapoint(df: pd.DataFrame, baseline_prompt: str) -> Non
             st.json(parsed_extraction)
 
             metrics = calculate_example_metrics(
-                json.loads(selected_row["ground_truth"]), parsed_extraction
+                selected_row["ground_truth"], parsed_extraction
             )
             st.markdown("#### Metrics")
             num_columns = 3
