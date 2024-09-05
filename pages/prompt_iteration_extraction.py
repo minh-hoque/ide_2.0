@@ -2,7 +2,7 @@ import os
 import json
 import re
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Union
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
@@ -39,6 +39,38 @@ def setup_page() -> None:
         '<h1 class="header">Extraction Prompt Development Workflow</h1>',
         unsafe_allow_html=True,
     )
+    st.sidebar.title("Extraction Settings")
+
+    prompt_mode_tooltip = """
+    Single: Use one prompt for all entities.
+    Multi: Create separate prompts for each entity.
+    """
+    st.session_state.prompt_mode = st.sidebar.radio(
+        "Prompt Mode", ["Single", "Multi"], help=prompt_mode_tooltip
+    )
+
+    if st.session_state.prompt_mode == "Multi":
+        setup_entity_sidebar()
+
+
+def setup_entity_sidebar() -> None:
+    """Set up the sidebar for entity input in Multi prompt mode."""
+    # Use session state to store and retrieve entities
+    if "entities" not in st.session_state:
+        st.session_state.entities = []
+
+    entities_input = st.sidebar.text_input(
+        "Enter entities (comma-separated)",
+        value=", ".join(st.session_state.entities),
+        key="entities_input",
+    )
+
+    # Only update entities if the input has changed
+    new_entities = [
+        entity.strip() for entity in entities_input.split(",") if entity.strip()
+    ]
+    if new_entities != st.session_state.entities:
+        st.session_state.entities = new_entities
 
 
 def load_data() -> pd.DataFrame:
@@ -73,25 +105,56 @@ def load_data() -> pd.DataFrame:
         st.stop()
 
 
-def load_prompt() -> str:
+def load_saved_prompts() -> List[str]:
+    """
+    Load the list of saved prompts from the storage directory based on the current prompt mode.
+
+    Returns:
+        List[str]: A list of saved prompt filenames, sorted newest first.
+    """
+    if not os.path.exists(EXTRACTION_PROMPTS_DIR):
+        return []
+
+    file_extension = ".json" if st.session_state.prompt_mode == "Multi" else ".txt"
+    prompt_files = [
+        f for f in os.listdir(EXTRACTION_PROMPTS_DIR) if f.endswith(file_extension)
+    ]
+    return sorted(prompt_files, reverse=True)
+
+
+def load_prompt() -> Union[str, Dict[str, str]]:
     """
     Load the baseline prompt from file or use default if not found.
 
     Returns:
-        str: The loaded prompt.
+        Union[str, Dict[str, str]]: The loaded prompt(s).
     """
     st.sidebar.markdown("## Load Saved Prompt")
     saved_prompts = load_saved_prompts()
     selected_prompt = st.sidebar.selectbox(
-        "Select a saved prompt:", ["Current Baseline"] + saved_prompts, index=0
+        "Select a saved prompt:",
+        ["Current Baseline"] + saved_prompts,
+        index=0,
+        key="prompt_selector",
     )
 
     if selected_prompt == "Current Baseline":
-        return EXTRACT_PROMPT
+        return (
+            EXTRACT_PROMPT
+            if st.session_state.prompt_mode == "Single"
+            else {entity: EXTRACT_PROMPT for entity in st.session_state.entities}
+        )
     else:
         try:
-            with open(os.path.join(EXTRACTION_PROMPTS_DIR, selected_prompt), "r") as f:
-                return f.read()
+            file_path = os.path.join(EXTRACTION_PROMPTS_DIR, selected_prompt)
+            if st.session_state.prompt_mode == "Multi":
+                with open(file_path, "r") as f:
+                    loaded_data = json.load(f)
+                st.session_state.entities = loaded_data["entities"]
+                return loaded_data["prompts"]
+            else:
+                with open(file_path, "r") as f:
+                    return f.read()
         except FileNotFoundError:
             logger.error(f"Selected prompt file {selected_prompt} not found.")
             st.sidebar.error(
@@ -100,33 +163,39 @@ def load_prompt() -> str:
             return "Extract the following entities from the text: {entities}\n\nText: {text}\n\nExtracted entities:"
 
 
-def load_saved_prompts() -> List[str]:
-    """
-    Load the list of saved prompts from the storage directory.
-
-    Returns:
-        List[str]: A list of saved prompt filenames, sorted newest first.
-    """
-    if not os.path.exists(EXTRACTION_PROMPTS_DIR):
-        return []
-
-    prompt_files = [f for f in os.listdir(EXTRACTION_PROMPTS_DIR) if f.endswith(".txt")]
-    return sorted(prompt_files, reverse=True)
-
-
-def display_prompt_dev_box(baseline_prompt: str) -> str:
+def display_prompt_dev_box(
+    baseline_prompt: Union[str, Dict[str, str]]
+) -> Dict[str, str]:
     """
     Display the prompt development box for modifying the baseline prompt.
 
     Args:
-        baseline_prompt (str): The initial prompt to display.
+        baseline_prompt (Union[str, Dict[str, str]]): The initial prompt(s) to display.
 
     Returns:
-        str: The modified prompt.
+        Dict[str, str]: A dictionary of modified prompts for each entity.
     """
     st.subheader("Prompt Dev Box")
     st.write("Modify the baseline prompt for entity extraction.")
-    return st.text_area("Modified Prompt", value=baseline_prompt, height=300)
+
+    if st.session_state.prompt_mode == "Single":
+        return {
+            "all": st.text_area("Modified Prompt", value=baseline_prompt, height=300)
+        }
+    else:
+        prompts = {}
+        tabs = st.tabs(st.session_state.entities)
+        for i, tab in enumerate(tabs):
+            with tab:
+                entity_prompt = baseline_prompt.get(
+                    st.session_state.entities[i], EXTRACT_PROMPT
+                )
+                prompts[st.session_state.entities[i]] = st.text_area(
+                    f"Modified Prompt for {st.session_state.entities[i]}",
+                    value=entity_prompt,
+                    height=300,
+                )
+        return prompts
 
 
 def parse_gpt4_output(output: str) -> Dict[str, List[str]]:
@@ -152,14 +221,14 @@ def parse_gpt4_output(output: str) -> Dict[str, List[str]]:
 
 
 def generate_extractions(
-    df: pd.DataFrame, modified_prompt: str, model: str
+    df: pd.DataFrame, modified_prompts: Dict[str, str], model: str
 ) -> List[Dict[str, List[str]]]:
     """
-    Generate extractions using the modified prompt for each row in the dataframe.
+    Generate extractions using the modified prompts for each row in the dataframe.
 
     Args:
         df (pd.DataFrame): The input dataframe containing texts to extract from.
-        modified_prompt (str): The prompt to use for extraction.
+        modified_prompts (Dict[str, str]): The prompts to use for extraction.
         model (str): The name of the model to use.
 
     Returns:
@@ -173,14 +242,20 @@ def generate_extractions(
     for index, row in df.iterrows():
         logger.info(f"Extraction for index {index}")
         text = row["text"]
-        formatted_prompt = modified_prompt.format(text=text)
-        extraction_response = query_gpt4(formatted_prompt)
+        extraction = {}
 
-        print("extraction_response")
-        print(extraction_response, type(extraction_response))
+        if st.session_state.prompt_mode == "Single":
+            formatted_prompt = modified_prompts["all"].format(text=text)
+            extraction_response = query_gpt4(formatted_prompt)
+            extraction = parse_gpt4_output(extraction_response)
+        else:
+            for entity, prompt in modified_prompts.items():
+                formatted_prompt = prompt.format(text=text)
+                extraction_response = query_gpt4(formatted_prompt)
+                entity_extraction = parse_gpt4_output(extraction_response)
+                extraction.update(entity_extraction)
 
-        parsed_extraction = parse_gpt4_output(extraction_response)
-        extractions.append(parsed_extraction)
+        extractions.append(extraction)
 
         progress = float(index + 1) / float(total_rows)
         progress_bar.progress(progress)
@@ -281,31 +356,44 @@ def display_metrics(metrics: Dict[str, Any]) -> None:
     """
     st.subheader("Evaluation Metrics")
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Average Precision", f"{metrics['overall']['precision']:.2f}")
-    col2.metric("Average Recall", f"{metrics['overall']['recall']:.2f}")
-    col3.metric("Average F1 Score", f"{metrics['overall']['f1']:.2f}")
+    if st.session_state.prompt_mode == "Single":
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Average Precision", f"{metrics['overall']['precision']:.2f}")
+        col2.metric("Average Recall", f"{metrics['overall']['recall']:.2f}")
+        col3.metric("Average F1 Score", f"{metrics['overall']['f1']:.2f}")
 
-    with st.expander("Entity-level Metrics"):
-        for entity, entity_metrics in metrics["entity_metrics"].items():
-            st.markdown(f"#### {entity}")
-            subcol1, subcol2, subcol3 = st.columns(3)
-            subcol1.metric("Precision", f"{entity_metrics['precision']:.2f}")
-            subcol2.metric("Recall", f"{entity_metrics['recall']:.2f}")
-            subcol3.metric("F1 Score", f"{entity_metrics['f1']:.2f}")
+        with st.expander("Entity-level Metrics"):
+            for entity, entity_metrics in metrics["entity_metrics"].items():
+                st.markdown(f"#### {entity}")
+                subcol1, subcol2, subcol3 = st.columns(3)
+                subcol1.metric("Precision", f"{entity_metrics['precision']:.2f}")
+                subcol2.metric("Recall", f"{entity_metrics['recall']:.2f}")
+                subcol3.metric("F1 Score", f"{entity_metrics['f1']:.2f}")
+    else:
+        tabs = st.tabs(st.session_state.entities)
+        for i, tab in enumerate(tabs):
+            with tab:
+                entity = st.session_state.entities[i]
+                entity_metrics = metrics["entity_metrics"].get(entity, {})
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Precision", f"{entity_metrics.get('precision', 0):.2f}")
+                col2.metric("Recall", f"{entity_metrics.get('recall', 0):.2f}")
+                col3.metric("F1 Score", f"{entity_metrics.get('f1', 0):.2f}")
 
 
-def preview_prompt(df: pd.DataFrame, modified_prompt: str, model: str) -> None:
+def preview_prompt(
+    df: pd.DataFrame, modified_prompts: Dict[str, str], model: str
+) -> None:
     """
     Preview the modified prompt by generating extractions and displaying results.
 
     Args:
         df (pd.DataFrame): The input dataframe.
-        modified_prompt (str): The modified prompt.
+        modified_prompts (Dict[str, str]): The modified prompts.
         model (str): The name of the model to use.
     """
     if st.button("Preview Prompt"):
-        extractions = generate_extractions(df, modified_prompt, model)
+        extractions = generate_extractions(df, modified_prompts, model)
         metrics = calculate_metrics(df["ground_truth"].tolist(), extractions)
         display_metrics(metrics)
         display_preview_results(df, extractions)
@@ -353,11 +441,11 @@ def display_preview_results(df: pd.DataFrame, extractions: List[Dict]) -> None:
 
 
 def save_prompt_and_extractions() -> None:
-    """Save the latest prompt and generated extractions."""
+    """Save the latest prompt(s) and generated extractions."""
     if st.button("Save Prompt"):
         if (
             "extractions" in st.session_state
-            and "modified_prompt" in st.session_state
+            and "modified_prompts" in st.session_state
             and "df" in st.session_state
         ):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M")
@@ -368,9 +456,13 @@ def save_prompt_and_extractions() -> None:
                 EXTRACTION_RESULTS_DIR, extractions_filename
             )
 
-            # Save the prompt
-            prompt_filename = f"extraction_prompt_{timestamp}.txt"
-            prompt_path = os.path.join(EXTRACTION_PROMPTS_DIR, prompt_filename)
+            # Save the prompt(s)
+            if st.session_state.prompt_mode == "Single":
+                prompt_filename = f"extraction_prompt_{timestamp}.txt"
+                prompt_path = os.path.join(EXTRACTION_PROMPTS_DIR, prompt_filename)
+            else:
+                prompt_filename = f"extraction_prompts_{timestamp}.json"
+                prompt_path = os.path.join(EXTRACTION_PROMPTS_DIR, prompt_filename)
 
             # Create a mapping entry
             mapping_entry = {
@@ -378,6 +470,7 @@ def save_prompt_and_extractions() -> None:
                 "prompt_file": prompt_filename,
                 "extractions_file": extractions_filename,
                 "metrics": st.session_state.metrics,
+                "prompt_mode": st.session_state.prompt_mode,
             }
 
             try:
@@ -389,10 +482,21 @@ def save_prompt_and_extractions() -> None:
                 os.makedirs(os.path.dirname(extractions_path), exist_ok=True)
                 combined_df.to_csv(extractions_path, index=False)
 
-                # Save prompt
+                # Save prompt(s)
                 os.makedirs(os.path.dirname(prompt_path), exist_ok=True)
-                with open(prompt_path, "w") as f:
-                    f.write(st.session_state.modified_prompt)
+                if st.session_state.prompt_mode == "Single":
+                    with open(prompt_path, "w") as f:
+                        f.write(st.session_state.modified_prompts["all"])
+                else:
+                    with open(prompt_path, "w") as f:
+                        json.dump(
+                            {
+                                "entities": st.session_state.entities,
+                                "prompts": st.session_state.modified_prompts,
+                            },
+                            f,
+                            indent=2,
+                        )
 
                 # Update the mapping file
                 if os.path.exists(PROMPT_MAPPING_FILE):
@@ -406,11 +510,13 @@ def save_prompt_and_extractions() -> None:
                 with open(PROMPT_MAPPING_FILE, "w") as f:
                     json.dump(mapping, f, indent=2)
 
-                st.success("Prompt and extractions saved successfully!")
-                logger.info(f"Saved prompt and extractions with timestamp {timestamp}")
+                st.success("Prompt(s) and extractions saved successfully!")
+                logger.info(
+                    f"Saved prompt(s) and extractions with timestamp {timestamp}"
+                )
             except Exception as e:
-                st.error(f"Error saving prompt and extractions: {str(e)}")
-                logger.error(f"Error saving prompt and extractions: {str(e)}")
+                st.error(f"Error saving prompt(s) and extractions: {str(e)}")
+                logger.error(f"Error saving prompt(s) and extractions: {str(e)}")
         else:
             st.error("No extractions or data to save. Please preview the prompt first.")
 
@@ -479,13 +585,15 @@ def format_metrics_markdown(precision: float, recall: float, f1: float) -> str:
 """
 
 
-def iterate_on_specific_datapoint(df: pd.DataFrame, baseline_prompt: str) -> None:
+def iterate_on_specific_datapoint(
+    df: pd.DataFrame, baseline_prompt: Union[str, Dict[str, str]]
+) -> None:
     """
     Handle the iteration on a specific datapoint when a row is selected.
 
     Args:
         df (pd.DataFrame): The input dataframe.
-        baseline_prompt (str): The baseline prompt.
+        baseline_prompt (Union[str, Dict[str, str]]): The baseline prompt(s).
     """
     selected_row = st.session_state.filtered_df.iloc[0]
     st.subheader(f"Iterating on: {selected_row['filename']}")
@@ -493,50 +601,97 @@ def iterate_on_specific_datapoint(df: pd.DataFrame, baseline_prompt: str) -> Non
     col1, col2 = st.columns(2)
 
     with col1:
-        st.write("**Original Text:**")
+        st.write("**Original Text**")
         st.text(selected_row["text"])
 
         st.write("**Ground Truth:**")
         st.json(json.loads(selected_row["ground_truth"]))
 
     with col2:
-        st.write("**Extraction Prompt:**")
-        iteration_prompt = st.text_area(
-            "Modify the prompt for this specific example:",
-            value=baseline_prompt,
-            height=400,
-        )
-
-        if st.button("Run Extraction"):
-            extraction_response = query_gpt4(
-                iteration_prompt.format(text=selected_row["text"])
+        if st.session_state.prompt_mode == "Single":
+            st.write("**Extraction Prompt**")
+            iteration_prompt = st.text_area(
+                "Modify the prompt for this specific example:",
+                value=baseline_prompt,
+                height=400,
             )
-            parsed_extraction = parse_gpt4_output(extraction_response)
 
-            st.write("**Extracted Entities:**")
-            st.json(parsed_extraction)
+            if st.button("Run Extraction"):
+                extraction_response = query_gpt4(
+                    iteration_prompt.format(text=selected_row["text"])
+                )
+                parsed_extraction = parse_gpt4_output(extraction_response)
 
-            metrics = calculate_example_metrics(
-                selected_row["ground_truth"], parsed_extraction
-            )
-            st.markdown("#### Metrics")
-            num_columns = 3
-            entities = list(metrics.keys())
-            num_rows = (len(entities) + num_columns - 1) // num_columns
+                st.write("**Extracted Entities:**")
+                st.json(parsed_extraction)
 
-            for i in range(0, len(entities), num_columns):
-                cols = st.columns(num_columns)
-                for j in range(num_columns):
-                    if i + j < len(entities):
-                        entity = entities[i + j]
-                        scores = metrics[entity]
-                        with cols[j]:
-                            st.write(f"**{entity}**")
-                            st.markdown(
-                                format_metrics_markdown(
-                                    scores["precision"], scores["recall"], scores["f1"]
+                metrics = calculate_example_metrics(
+                    selected_row["ground_truth"], parsed_extraction
+                )
+                st.markdown("#### Metrics")
+                num_columns = 3
+                entities = list(metrics.keys())
+                num_rows = (len(entities) + num_columns - 1) // num_columns
+
+                for i in range(0, len(entities), num_columns):
+                    cols = st.columns(num_columns)
+                    for j in range(num_columns):
+                        if i + j < len(entities):
+                            entity = entities[i + j]
+                            scores = metrics[entity]
+                            with cols[j]:
+                                st.write(f"**{entity}**")
+                                st.markdown(
+                                    format_metrics_markdown(
+                                        scores["precision"],
+                                        scores["recall"],
+                                        scores["f1"],
+                                    )
                                 )
-                            )
+        else:
+            tabs = st.tabs(st.session_state.entities)
+            for i, tab in enumerate(tabs):
+                with tab:
+                    entity = st.session_state.entities[i]
+                    st.write(f"**Extraction Prompt for {entity}**")
+                    iteration_prompt = st.text_area(
+                        f"Modify the prompt for {entity} in this specific example:",
+                        value=baseline_prompt.get(entity, EXTRACT_PROMPT),
+                        height=400,
+                    )
+
+                    if st.button(f"Run Extraction for {entity}"):
+                        extraction_response = query_gpt4(
+                            iteration_prompt.format(text=selected_row["text"])
+                        )
+                        parsed_extraction = parse_gpt4_output(extraction_response)
+
+                        st.write(f"**Extracted Entities for {entity}:**")
+                        st.json(parsed_extraction)
+
+                        metrics = calculate_example_metrics(
+                            selected_row["ground_truth"], parsed_extraction
+                        )
+                        st.markdown(f"#### Metrics for {entity}")
+                        num_columns = 3
+                        entities = list(metrics.keys())
+                        num_rows = (len(entities) + num_columns - 1) // num_columns
+
+                        for i in range(0, len(entities), num_columns):
+                            cols = st.columns(num_columns)
+                            for j in range(num_columns):
+                                if i + j < len(entities):
+                                    entity = entities[i + j]
+                                    scores = metrics[entity]
+                                    with cols[j]:
+                                        st.write(f"**{entity}**")
+                                        st.markdown(
+                                            format_metrics_markdown(
+                                                scores["precision"],
+                                                scores["recall"],
+                                                scores["f1"],
+                                            )
+                                        )
 
     if st.button("Back to All Extractions"):
         st.session_state.selected_row_index = -1
@@ -553,14 +708,14 @@ def main() -> None:
     if st.session_state.get("selected_row_index", -1) >= 0:
         iterate_on_specific_datapoint(df, baseline_prompt)
     else:
-        modified_prompt = display_prompt_dev_box(baseline_prompt)
-        st.session_state.modified_prompt = modified_prompt
+        modified_prompts = display_prompt_dev_box(baseline_prompt)
+        st.session_state.modified_prompts = modified_prompts
 
         model = st.selectbox(
             "Select a model", ["gpt-4o", "gpt-4o-2024-08-06", "gpt-4-turbo-preview"]
         )
 
-        preview_prompt(df, modified_prompt, model)
+        preview_prompt(df, modified_prompts, model)
         save_prompt_and_extractions()
 
 

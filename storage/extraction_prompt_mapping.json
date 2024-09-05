@@ -34,5 +34,83 @@
       "avg_recall": 1.0,
       "avg_f1": 1.0
     }
+  },
+  {
+    "timestamp": "20240905_0025",
+    "prompt_file": "extraction_prompts_20240905_0025.json",
+    "extractions_file": "experiment_extractions_20240905_0025.csv",
+    "metrics": {
+      "overall": {
+        "precision": 1.0,
+        "recall": 0.5263157894736842,
+        "f1": 0.6896551724137931
+      },
+      "entity_metrics": {
+        "policy_number": {
+          "tp": 10,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "named_insured": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 4,
+          "precision": 0,
+          "recall": 0.0,
+          "f1": 0
+        },
+        "effective_date": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 5,
+          "precision": 0,
+          "recall": 0.0,
+          "f1": 0
+        }
+      }
+    },
+    "prompt_mode": "Multi"
+  },
+  {
+    "timestamp": "20240905_0100",
+    "prompt_file": "extraction_prompts_20240905_0100.json",
+    "extractions_file": "experiment_extractions_20240905_0100.csv",
+    "metrics": {
+      "overall": {
+        "precision": 0,
+        "recall": 0.0,
+        "f1": 0
+      },
+      "entity_metrics": {
+        "policy_number": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 10,
+          "precision": 0,
+          "recall": 0.0,
+          "f1": 0
+        },
+        "named_insured": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 4,
+          "precision": 0,
+          "recall": 0.0,
+          "f1": 0
+        },
+        "effective_date": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 5,
+          "precision": 0,
+          "recall": 0.0,
+          "f1": 0
+        }
+      }
+    },
+    "prompt_mode": "Multi"
   }
 ]
