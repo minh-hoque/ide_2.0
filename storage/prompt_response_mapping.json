@@ -3,5 +3,10 @@
     "timestamp": "20240831_2158",
     "prompt_file": "prompt_20240831_2158.txt",
     "responses_file": "experiment_responses_20240831_2158.csv"
+  },
+  {
+    "timestamp": "20240906_0059",
+    "prompt_file": "prompt_20240906_0059.txt",
+    "responses_file": "experiment_responses_20240906_0059.csv"
   }
 ]

@@ -13,6 +13,7 @@ from helper.logging import get_logger
 from prompts.auto_evaluation_prompts import (
     LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT,
     LLM_AS_A_JUDGE_SME_FEEDBACK_PROMPT,
+    LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT_V2,
 )
 import pandas as pd
 from tenacity import (
@@ -28,6 +29,10 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Get a logger for this module
 logger = get_logger(__name__)
+
+
+# Set auto_eval prompt
+AUTO_EVAL_PROMPT = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT_V2
 
 
 # Data Class for Auto Evaluation Result from LLM
@@ -136,12 +141,16 @@ def auto_evaluate_responses(df):
         logger.debug(f"Question: {row['question']}")
 
         if row["rating"] == "ACCEPT":
-            formated_prompt = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT.format(
-                old_response=row["response"], new_response=row["new_response"]
+            formated_prompt = AUTO_EVAL_PROMPT.format(
+                old_response=row["response"],
+                new_response=row["new_response"],
+                question=row["question"],
             )
         elif row["edited_gt"] != "":
-            formated_prompt = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT.format(
-                old_response=row["edited_gt"], new_response=row["new_response"]
+            formated_prompt = AUTO_EVAL_PROMPT.format(
+                old_response=row["edited_gt"],
+                new_response=row["new_response"],
+                question=row["question"],
             )
         elif row["sme_feedback"] != "":
             formated_prompt = LLM_AS_A_JUDGE_SME_FEEDBACK_PROMPT.format(
