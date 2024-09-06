@@ -30,6 +30,9 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Get a logger for this module
 logger = get_logger(__name__)
 
+# Set the logging level based on the session state
+if "logging_level" in st.session_state:
+    logger.setLevel(st.session_state["logging_level"])
 
 # Set auto_eval prompt
 AUTO_EVAL_PROMPT = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT_V2

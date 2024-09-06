@@ -10,7 +10,7 @@ from streamlit.delta_generator import DeltaGenerator
 
 from css.style import apply_snorkel_style
 from helper.llms import query_gpt4, auto_evaluate_responses
-from helper.logging import get_logger
+from helper.logging import get_logger, setup_logging
 from prompts.base_prompts import BASELINE_PROMPT
 
 # Load environment variables and set up OpenAI client
@@ -32,14 +32,15 @@ def setup_page() -> None:
     )
 
 
-def setup_logging() -> None:
-    """Set up logging level selector."""
-    logging_level = st.selectbox(
-        "Select Logging Level",
-        ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
-        index=1,
-    )
-    logger.setLevel(logging_level)
+# def setup_logging() -> None:
+#     """Set up logging level selector in the sidebar."""
+#     with st.sidebar:
+#         logging_level = st.selectbox(
+#             "Select Logging Level",
+#             ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
+#             index=1,
+#         )
+#     logger.setLevel(logging_level)
 
 
 def load_data() -> pd.DataFrame:
@@ -641,11 +642,13 @@ def iterate_on_specific_question(
 def main() -> None:
     """Main function to run the Streamlit app for prompt iteration."""
     setup_page()
-    setup_logging()
+    logger, logging_level = setup_logging(__name__)
+    st.session_state["logging_level"] = logging_level
     df = load_data()
     display_evaluated_responses(df)
     baseline_prompt = load_prompt()
-
+    logger.info("TEST")
+    logger.debug("TEST")
     if st.session_state.get("selected_row_index", -1) >= 0:
         iterate_on_specific_question(
             st.session_state.filtered_df,

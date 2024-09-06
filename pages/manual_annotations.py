@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from css.style import apply_snorkel_style
-from helper.logging import get_logger
+from helper.logging import get_logger, setup_logging
 from typing import Tuple
 import os
 
@@ -199,6 +199,8 @@ def main():
     Main function to run the Streamlit app for manual annotations.
     """
     setup_page()
+    logger, logging_level = setup_logging(__name__)
+    st.session_state["logging_level"] = logging_level
     uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
 
     if uploaded_file is not None:

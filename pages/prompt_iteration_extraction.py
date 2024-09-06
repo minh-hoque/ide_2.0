@@ -11,7 +11,7 @@ import html
 
 from css.style import apply_snorkel_style
 from helper.llms import query_gpt4
-from helper.logging import get_logger
+from helper.logging import get_logger, setup_logging
 from prompts.extraction_prompts import EXTRACT_PROMPT
 
 # Constants
@@ -701,6 +701,7 @@ def iterate_on_specific_datapoint(
 def main() -> None:
     """Main function to run the Streamlit app for extraction prompt iteration."""
     setup_page()
+    logger, logging_level = setup_logging(__name__)
     df = load_data()
     display_evaluated_extractions(df)
     baseline_prompt = load_prompt()

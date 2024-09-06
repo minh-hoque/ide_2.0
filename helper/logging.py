@@ -1,5 +1,6 @@
 import logging
 import colorlog
+import streamlit as st
 
 
 def setup_logger(name=__name__, level=logging.INFO):
@@ -59,3 +60,16 @@ def get_logger(name=__name__, level=logging.INFO):
         logging.Logger: A configured logger instance.
     """
     return setup_logger(name, level)
+
+
+def setup_logging(logger_name: str):
+    """Set up logging level selector in the sidebar for all pages."""
+    logger = get_logger(logger_name)
+    with st.sidebar:
+        logging_level = st.selectbox(
+            "Select Logging Level",
+            ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
+            index=1,
+        )
+    logger.setLevel(logging_level)
+    return logger, logging_level
