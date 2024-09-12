@@ -13,6 +13,13 @@ from helper.llms import query_gpt4, auto_evaluate_responses
 from helper.logging import get_logger, setup_logging
 from prompts.base_prompts import BASELINE_PROMPT
 
+# Constants for directories and folders
+STORAGE_DIR = "./storage"
+MANUAL_ANNOTATIONS_DIR = os.path.join(STORAGE_DIR, "qna_data")
+PROMPTS_DIR = os.path.join(STORAGE_DIR, "qna_prompts")
+ITERATION_RESPONSES_DIR = os.path.join(STORAGE_DIR, "qna_results")
+MAPPING_FILE = os.path.join(STORAGE_DIR, "prompt_response_mapping.json")
+
 # Load environment variables and set up OpenAI client
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -32,17 +39,6 @@ def setup_page() -> None:
     )
 
 
-# def setup_logging() -> None:
-#     """Set up logging level selector in the sidebar."""
-#     with st.sidebar:
-#         logging_level = st.selectbox(
-#             "Select Logging Level",
-#             ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
-#             index=1,
-#         )
-#     logger.setLevel(logging_level)
-
-
 def load_data() -> pd.DataFrame:
     """
     Load and prepare the dataframe from evaluated responses.
@@ -51,9 +47,7 @@ def load_data() -> pd.DataFrame:
         pd.DataFrame: Preprocessed dataframe containing evaluated responses.
     """
     eval_files = [
-        f
-        for f in os.listdir("./storage/manual_annotations")
-        if f.endswith("evaluated.csv")
+        f for f in os.listdir(MANUAL_ANNOTATIONS_DIR) if f.endswith("evaluated.csv")
     ]
 
     if not eval_files:
@@ -70,7 +64,7 @@ def load_data() -> pd.DataFrame:
 
     try:
         df = pd.read_csv(
-            os.path.join("./storage/manual_annotations", selected_file),
+            os.path.join(MANUAL_ANNOTATIONS_DIR, selected_file),
             na_values=["", "nan", "NaN", "None"],
             keep_default_na=True,
         )
@@ -164,11 +158,10 @@ def display_evaluated_responses(df: pd.DataFrame) -> None:
 
 def load_saved_prompts():
     """Load the list of saved prompts from the storage directory."""
-    prompts_dir = "./storage/prompts"
-    if not os.path.exists(prompts_dir):
+    if not os.path.exists(PROMPTS_DIR):
         return []
 
-    prompt_files = [f for f in os.listdir(prompts_dir) if f.endswith(".txt")]
+    prompt_files = [f for f in os.listdir(PROMPTS_DIR) if f.endswith(".txt")]
     prompt_files.sort(reverse=True)  # Sort files in reverse order (newest first)
     return prompt_files
 
@@ -187,15 +180,10 @@ def load_prompt() -> str:
     )
 
     if selected_prompt == "Current Baseline":
-        try:
-            with open("./storage/baseline_prompt.txt", "r") as f:
-                return f.read()
-        except FileNotFoundError:
-            logger.warning("No baseline prompt found. Using default prompt.")
-            return BASELINE_PROMPT
+        return BASELINE_PROMPT
     else:
         try:
-            with open(os.path.join("./storage/prompts", selected_prompt), "r") as f:
+            with open(os.path.join(PROMPTS_DIR, selected_prompt), "r") as f:
                 return f.read()
         except FileNotFoundError:
             logger.error(f"Selected prompt file {selected_prompt} not found.")
@@ -513,13 +501,11 @@ def save_prompt_and_responses() -> None:
                 }
             )
             responses_filename = f"experiment_responses_{timestamp}.csv"
-            responses_path = os.path.join(
-                "./storage/iteration_responses", responses_filename
-            )
+            responses_path = os.path.join(ITERATION_RESPONSES_DIR, responses_filename)
 
             # Save the prompt
             prompt_filename = f"prompt_{timestamp}.txt"
-            prompt_path = os.path.join("./storage/prompts", prompt_filename)
+            prompt_path = os.path.join(PROMPTS_DIR, prompt_filename)
 
             # Create a mapping entry
             mapping_entry = {
@@ -539,16 +525,15 @@ def save_prompt_and_responses() -> None:
                     f.write(st.session_state.modified_prompt)
 
                 # Update the mapping file
-                mapping_file = "./storage/prompt_response_mapping.json"
-                if os.path.exists(mapping_file):
-                    with open(mapping_file, "r") as f:
+                if os.path.exists(MAPPING_FILE):
+                    with open(MAPPING_FILE, "r") as f:
                         mapping = json.load(f)
                 else:
                     mapping = []
 
                 mapping.append(mapping_entry)
 
-                with open(mapping_file, "w") as f:
+                with open(MAPPING_FILE, "w") as f:
                     json.dump(mapping, f, indent=2)
 
                 st.success("Prompt and responses saved successfully!")
