@@ -2,7 +2,7 @@ import os
 import json
 import re
 from datetime import datetime
-from typing import Dict, List, Any, Union
+from typing import Dict, List, Any, Union, Optional
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
@@ -106,8 +106,9 @@ def load_data() -> pd.DataFrame:
         st.error("No file selected. Please try again.")
         st.stop()
 
+    file_path = os.path.join(EXTRACTION_DATA_DIR, selected_file)
     try:
-        df = pd.read_csv(os.path.join(EXTRACTION_DATA_DIR, selected_file))
+        df = pd.read_csv(file_path)
         st.session_state.df = df  # Store df in session state for later use
         return df
     except Exception as e:
@@ -146,7 +147,15 @@ def load_prompt() -> Union[str, Dict[str, str]]:
 
     # Initialize last_selected_prompt if it doesn't exist
     if "last_selected_prompt" not in st.session_state:
-        st.session_state.last_selected_prompt = "Current Baseline"
+        st.session_state.last_selected_prompt = prompt_list[0]
+
+    print(
+        "st.session_state.last_selected_prompt", st.session_state.last_selected_prompt
+    )
+
+    # Check if the last selected prompt is still in the list
+    if st.session_state.last_selected_prompt not in prompt_list:
+        st.session_state.last_selected_prompt = prompt_list[0]
 
     selected_prompt = st.sidebar.selectbox(
         "Select a saved prompt:",
@@ -154,6 +163,8 @@ def load_prompt() -> Union[str, Dict[str, str]]:
         index=prompt_list.index(st.session_state.last_selected_prompt),
         key="prompt_selector",
     )
+
+    print("selected_prompt", selected_prompt)
 
     # Load the prompt if it's the first time or if the selection has changed
     if (
@@ -179,6 +190,7 @@ def load_prompt() -> Union[str, Dict[str, str]]:
                 else:
                     with open(file_path, "r") as f:
                         loaded_prompt = f.read()
+
             except FileNotFoundError:
                 logger.error(f"Selected prompt file {selected_prompt} not found.")
                 st.sidebar.error(
@@ -192,9 +204,7 @@ def load_prompt() -> Union[str, Dict[str, str]]:
     return st.session_state.modified_prompts
 
 
-def display_prompt_dev_box(
-    baseline_prompt: Union[str, Dict[str, str]]
-) -> Dict[str, str]:
+def display_prompt_dev_box(prompt: Union[str, Dict[str, str]]) -> Dict[str, str]:
     """
     Display the prompt development box for modifying the baseline prompt.
 
@@ -208,33 +218,50 @@ def display_prompt_dev_box(
     st.write("Modify the baseline prompt for entity extraction.")
 
     if st.session_state.prompt_mode == "Single":
-        return {
-            "all": st.text_area("Modified Prompt", value=baseline_prompt, height=600)
-        }
+        if isinstance(prompt, str):
+            return {
+                "all": st.text_area("Modified Prompt", value=prompt, height=600) or ""
+            }
+        else:
+            return {
+                "all": st.text_area(
+                    "Modified Prompt",
+                    value=prompt.get("all", EXTRACT_PROMPT),
+                    height=600,
+                )
+                or ""
+            }
     else:
         prompts = {}
         tabs = st.tabs(st.session_state.entities)
         for i, tab in enumerate(tabs):
             with tab:
-                entity_prompt = baseline_prompt.get(st.session_state.entities[i])
-                prompts[st.session_state.entities[i]] = st.text_area(
-                    f"Modified Prompt for {st.session_state.entities[i]}",
-                    value=entity_prompt,
-                    height=500,
+                entity = st.session_state.entities[i]
+                entity_prompt = prompt.get(entity, "")
+                prompts[entity] = (
+                    st.text_area(
+                        f"Modified Prompt for {entity}",
+                        value=entity_prompt,
+                        height=500,
+                    )
+                    or ""
                 )
         return prompts
 
 
-def parse_gpt4_output_to_dict(output: str) -> Dict[str, List[str]]:
+def parse_gpt4_output_to_dict(output: Optional[str]) -> Dict[str, List[str]]:
     """
     Parse the GPT-4 output from a string that may include markdown JSON formatting.
 
     Args:
-        output (str): The raw output from GPT-4.
+        output (Optional[str]): The raw output from GPT-4.
 
     Returns:
         Dict[str, List[str]]: A dictionary of parsed entities and their values.
     """
+    if output is None:
+        return {}
+
     json_match = re.search(r"```json\s*(.*?)\s*```", output, re.DOTALL)
     json_str = json_match.group(1) if json_match else output
 
@@ -274,13 +301,13 @@ def generate_extractions(
         if st.session_state.prompt_mode == "Single":
             formatted_prompt = modified_prompts["all"].format(text=text)
             extraction_response = query_gpt4(formatted_prompt)
-            extraction = parse_gpt4_output_to_dict(extraction_response)
+            extraction = parse_gpt4_output_to_dict(extraction_response or "")
         else:
             for entity, prompt in modified_prompts.items():
                 print(entity, prompt)
                 formatted_prompt = prompt.format(text=text)
                 extraction_response = query_gpt4(formatted_prompt)
-                entity_extraction = parse_gpt4_output_to_dict(extraction_response)
+                entity_extraction = parse_gpt4_output_to_dict(extraction_response or "")
                 extraction.update(entity_extraction)
 
         extractions.append(extraction)
@@ -310,9 +337,9 @@ def calculate_metrics(
     entity_metrics = {}
     total_metrics = {"tp": 0, "fp": 0, "fn": 0}
 
-    for i, (gt_str, ext) in enumerate(zip(ground_truth, extractions)):
+    for i, (gt_item, ext) in enumerate(zip(ground_truth, extractions)):
         try:
-            gt = json.loads(gt_str)
+            gt = json.loads(gt_item) if isinstance(gt_item, str) else gt_item
             for entity, gt_values in gt.items():
                 if entity not in entity_metrics:
                     entity_metrics[entity] = {"tp": 0, "fp": 0, "fn": 0}
@@ -330,7 +357,7 @@ def calculate_metrics(
                 total_metrics["fn"] += fn
         except json.JSONDecodeError as e:
             logger.error(f"Error parsing JSON for entry {i}:")
-            logger.error(f"String: {gt_str}")
+            logger.error(f"String: {gt_item}")
             logger.error(f"Error: {str(e)}")
             continue
 
@@ -637,96 +664,51 @@ def iterate_on_specific_datapoint(
 
     with col2:
         if st.session_state.prompt_mode == "Single":
-            st.write("**Extraction Prompt**")
             iteration_prompt = st.text_area(
                 "Modify the prompt for this specific example:",
                 value=prompts["all"],
                 height=400,
             )
-
-            if st.button("Run Extraction"):
-                extraction_response = query_gpt4(
-                    iteration_prompt.format(text=selected_row["text"])
-                )
-                parsed_extraction = parse_gpt4_output_to_dict(extraction_response)
-
-                st.write("**Extracted Entities:**")
-                st.json(parsed_extraction)
-
-                metrics = calculate_example_metrics(
-                    selected_row["ground_truth"], parsed_extraction
-                )
-                st.markdown("#### Metrics")
-                num_columns = 3
-                entities = list(metrics.keys())
-                num_rows = (len(entities) + num_columns - 1) // num_columns
-
-                for i in range(0, len(entities), num_columns):
-                    cols = st.columns(num_columns)
-                    for j in range(num_columns):
-                        if i + j < len(entities):
-                            entity = entities[i + j]
-                            scores = metrics[entity]
-                            with cols[j]:
-                                st.write(f"**{entity}**")
-                                st.markdown(
-                                    format_metrics_markdown(
-                                        scores["precision"],
-                                        scores["recall"],
-                                        scores["f1"],
-                                    )
-                                )
+            run_extraction_for_entity(iteration_prompt, selected_row["text"], "all")
         else:
             tabs = st.tabs(st.session_state.entities)
             for i, tab in enumerate(tabs):
                 with tab:
                     entity = st.session_state.entities[i]
-                    st.write(f"**Extraction Prompt for {entity}**")
-                    st.write(prompts)
                     iteration_prompt = st.text_area(
                         f"Modify the prompt for {entity} in this specific example:",
-                        value=prompts.get(entity),
+                        value=prompts.get(entity, ""),
                         height=400,
                     )
-
-                    if st.button(f"Run Extraction for {entity}"):
-                        extraction_response = query_gpt4(
-                            iteration_prompt.format(text=selected_row["text"])
-                        )
-                        parsed_extraction = parse_gpt4_output_to_dict(
-                            extraction_response
-                        )
-
-                        st.write(f"**Extracted Entities for {entity}:**")
-                        st.json(parsed_extraction)
-
-                        metrics = calculate_example_metrics(
-                            selected_row["ground_truth"], parsed_extraction
-                        )
-                        st.markdown(f"#### Metrics for {entity}")
-                        num_columns = 3
-                        entities = list(metrics.keys())
-                        num_rows = (len(entities) + num_columns - 1) // num_columns
-
-                        for i in range(0, len(entities), num_columns):
-                            cols = st.columns(num_columns)
-                            for j in range(num_columns):
-                                if i + j < len(entities):
-                                    entity = entities[i + j]
-                                    scores = metrics[entity]
-                                    with cols[j]:
-                                        st.write(f"**{entity}**")
-                                        st.markdown(
-                                            format_metrics_markdown(
-                                                scores["precision"],
-                                                scores["recall"],
-                                                scores["f1"],
-                                            )
-                                        )
+                    run_extraction_for_entity(
+                        iteration_prompt, selected_row["text"], entity
+                    )
 
     if st.button("Back to All Extractions"):
         st.session_state.selected_row_index = -1
         st.rerun()
+
+
+def run_extraction_for_entity(prompt: str, text: str, entity: str) -> None:
+    if st.button(f"Run Extraction for {entity}"):
+        extraction_response = query_gpt4(prompt.format(text=text))
+        parsed_extraction = parse_gpt4_output_to_dict(extraction_response or "")
+
+        st.write(f"**Extracted Entities for {entity}:**")
+        st.json(parsed_extraction)
+
+        entity_metrics = calculate_example_metrics(
+            json.loads(st.session_state.filtered_df.iloc[0]["ground_truth"]),
+            parsed_extraction,
+        )
+        st.markdown(f"#### Metrics for {entity}")
+        st.markdown(
+            format_metrics_markdown(
+                entity_metrics[entity]["precision"],
+                entity_metrics[entity]["recall"],
+                entity_metrics[entity]["f1"],
+            )
+        )
 
 
 def main() -> None:
