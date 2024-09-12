@@ -14,7 +14,7 @@ from helper.llms import query_gpt4
 from helper.logging import get_logger, setup_logging
 from prompts.extraction_prompts import EXTRACT_PROMPT
 
-# Constants
+# Constants for file paths
 STORAGE_DIR = "./storage"
 EXTRACTION_DATA_DIR = f"{STORAGE_DIR}/extraction_data"
 EXTRACTION_PROMPTS_DIR = f"{STORAGE_DIR}/extraction_prompts"
@@ -30,7 +30,12 @@ logger = get_logger(__name__)
 
 
 def setup_page() -> None:
-    """Set up the Streamlit page configuration."""
+    """
+    Set up the Streamlit page configuration.
+
+    This function configures the page title, icon, layout, and adds custom CSS styling.
+    It also sets up the sidebar for prompt mode selection.
+    """
     st.set_page_config(
         page_title="Extraction Prompt Iteration", page_icon=":mag:", layout="wide"
     )
@@ -41,6 +46,7 @@ def setup_page() -> None:
     )
     st.sidebar.title("Extraction Settings")
 
+    # Set up prompt mode selection in sidebar
     prompt_mode_tooltip = """
     Single: Use one prompt for all entities.
     Multi: Create separate prompts for each entity.
@@ -54,7 +60,12 @@ def setup_page() -> None:
 
 
 def setup_entity_sidebar() -> None:
-    """Set up the sidebar for entity input in Multi prompt mode."""
+    """
+    Set up the sidebar for entity input in Multi prompt mode.
+
+    This function allows users to input multiple entities for extraction
+    and stores them in the session state.
+    """
     # Use session state to store and retrieve entities
     if "entities" not in st.session_state:
         st.session_state.entities = []
@@ -97,7 +108,7 @@ def load_data() -> pd.DataFrame:
 
     try:
         df = pd.read_csv(os.path.join(EXTRACTION_DATA_DIR, selected_file))
-        st.session_state.df = df  # Store df in session state
+        st.session_state.df = df  # Store df in session state for later use
         return df
     except Exception as e:
         logger.error(f"Error loading file {selected_file}: {str(e)}")
@@ -105,7 +116,7 @@ def load_data() -> pd.DataFrame:
         st.stop()
 
 
-def load_saved_prompts() -> List[str]:
+def list_saved_prompts() -> List[str]:
     """
     Load the list of saved prompts from the storage directory based on the current prompt mode.
 
@@ -130,37 +141,55 @@ def load_prompt() -> Union[str, Dict[str, str]]:
         Union[str, Dict[str, str]]: The loaded prompt(s).
     """
     st.sidebar.markdown("## Load Saved Prompt")
-    saved_prompts = load_saved_prompts()
+    saved_prompts = list_saved_prompts()
+    prompt_list = ["Current Baseline"] + saved_prompts
+
+    # Initialize last_selected_prompt if it doesn't exist
+    if "last_selected_prompt" not in st.session_state:
+        st.session_state.last_selected_prompt = "Current Baseline"
+
     selected_prompt = st.sidebar.selectbox(
         "Select a saved prompt:",
-        ["Current Baseline"] + saved_prompts,
-        index=0,
+        prompt_list,
+        index=prompt_list.index(st.session_state.last_selected_prompt),
         key="prompt_selector",
     )
 
-    if selected_prompt == "Current Baseline":
-        return (
-            EXTRACT_PROMPT
-            if st.session_state.prompt_mode == "Single"
-            else {entity: EXTRACT_PROMPT for entity in st.session_state.entities}
-        )
-    else:
-        try:
-            file_path = os.path.join(EXTRACTION_PROMPTS_DIR, selected_prompt)
-            if st.session_state.prompt_mode == "Multi":
-                with open(file_path, "r") as f:
-                    loaded_data = json.load(f)
-                st.session_state.entities = loaded_data["entities"]
-                return loaded_data["prompts"]
-            else:
-                with open(file_path, "r") as f:
-                    return f.read()
-        except FileNotFoundError:
-            logger.error(f"Selected prompt file {selected_prompt} not found.")
-            st.sidebar.error(
-                f"Selected prompt file {selected_prompt} not found. Using default prompt."
+    # Load the prompt if it's the first time or if the selection has changed
+    if (
+        "modified_prompts" not in st.session_state
+        or st.session_state.last_selected_prompt != selected_prompt
+    ):
+        st.session_state.last_selected_prompt = selected_prompt
+
+        if selected_prompt == "Current Baseline":
+            loaded_prompt = (
+                EXTRACT_PROMPT
+                if st.session_state.prompt_mode == "Single"
+                else {entity: EXTRACT_PROMPT for entity in st.session_state.entities}
             )
-            return "Extract the following entities from the text: {entities}\n\nText: {text}\n\nExtracted entities:"
+        else:
+            try:
+                file_path = os.path.join(EXTRACTION_PROMPTS_DIR, selected_prompt)
+                if st.session_state.prompt_mode == "Multi":
+                    with open(file_path, "r") as f:
+                        loaded_data = json.load(f)
+                    st.session_state.entities = loaded_data["entities"]
+                    loaded_prompt = loaded_data["prompts"]
+                else:
+                    with open(file_path, "r") as f:
+                        loaded_prompt = f.read()
+            except FileNotFoundError:
+                logger.error(f"Selected prompt file {selected_prompt} not found.")
+                st.sidebar.error(
+                    f"Selected prompt file {selected_prompt} not found. Using default prompt."
+                )
+                loaded_prompt = "Extract the following entities from the text: {entities}\n\nText: {text}\n\nExtracted entities:"
+
+        # Update the session state with the newly loaded prompt
+        st.session_state.modified_prompts = loaded_prompt
+
+    return st.session_state.modified_prompts
 
 
 def display_prompt_dev_box(
@@ -180,25 +209,23 @@ def display_prompt_dev_box(
 
     if st.session_state.prompt_mode == "Single":
         return {
-            "all": st.text_area("Modified Prompt", value=baseline_prompt, height=300)
+            "all": st.text_area("Modified Prompt", value=baseline_prompt, height=600)
         }
     else:
         prompts = {}
         tabs = st.tabs(st.session_state.entities)
         for i, tab in enumerate(tabs):
             with tab:
-                entity_prompt = baseline_prompt.get(
-                    st.session_state.entities[i], EXTRACT_PROMPT
-                )
+                entity_prompt = baseline_prompt.get(st.session_state.entities[i])
                 prompts[st.session_state.entities[i]] = st.text_area(
                     f"Modified Prompt for {st.session_state.entities[i]}",
                     value=entity_prompt,
-                    height=300,
+                    height=500,
                 )
         return prompts
 
 
-def parse_gpt4_output(output: str) -> Dict[str, List[str]]:
+def parse_gpt4_output_to_dict(output: str) -> Dict[str, List[str]]:
     """
     Parse the GPT-4 output from a string that may include markdown JSON formatting.
 
@@ -247,12 +274,13 @@ def generate_extractions(
         if st.session_state.prompt_mode == "Single":
             formatted_prompt = modified_prompts["all"].format(text=text)
             extraction_response = query_gpt4(formatted_prompt)
-            extraction = parse_gpt4_output(extraction_response)
+            extraction = parse_gpt4_output_to_dict(extraction_response)
         else:
             for entity, prompt in modified_prompts.items():
+                print(entity, prompt)
                 formatted_prompt = prompt.format(text=text)
                 extraction_response = query_gpt4(formatted_prompt)
-                entity_extraction = parse_gpt4_output(extraction_response)
+                entity_extraction = parse_gpt4_output_to_dict(extraction_response)
                 extraction.update(entity_extraction)
 
         extractions.append(extraction)
@@ -301,9 +329,9 @@ def calculate_metrics(
                 total_metrics["fp"] += fp
                 total_metrics["fn"] += fn
         except json.JSONDecodeError as e:
-            print(f"Error parsing JSON for entry {i}:")
-            print(f"String: {gt_str}")
-            print(f"Error: {str(e)}")
+            logger.error(f"Error parsing JSON for entry {i}:")
+            logger.error(f"String: {gt_str}")
+            logger.error(f"Error: {str(e)}")
             continue
 
     def calculate_prf(metrics):
@@ -586,7 +614,7 @@ def format_metrics_markdown(precision: float, recall: float, f1: float) -> str:
 
 
 def iterate_on_specific_datapoint(
-    df: pd.DataFrame, baseline_prompt: Union[str, Dict[str, str]]
+    df: pd.DataFrame, prompts: Union[str, Dict[str, str]]
 ) -> None:
     """
     Handle the iteration on a specific datapoint when a row is selected.
@@ -612,7 +640,7 @@ def iterate_on_specific_datapoint(
             st.write("**Extraction Prompt**")
             iteration_prompt = st.text_area(
                 "Modify the prompt for this specific example:",
-                value=baseline_prompt,
+                value=prompts["all"],
                 height=400,
             )
 
@@ -620,7 +648,7 @@ def iterate_on_specific_datapoint(
                 extraction_response = query_gpt4(
                     iteration_prompt.format(text=selected_row["text"])
                 )
-                parsed_extraction = parse_gpt4_output(extraction_response)
+                parsed_extraction = parse_gpt4_output_to_dict(extraction_response)
 
                 st.write("**Extracted Entities:**")
                 st.json(parsed_extraction)
@@ -654,9 +682,10 @@ def iterate_on_specific_datapoint(
                 with tab:
                     entity = st.session_state.entities[i]
                     st.write(f"**Extraction Prompt for {entity}**")
+                    st.write(prompts)
                     iteration_prompt = st.text_area(
                         f"Modify the prompt for {entity} in this specific example:",
-                        value=baseline_prompt.get(entity, EXTRACT_PROMPT),
+                        value=prompts.get(entity),
                         height=400,
                     )
 
@@ -664,7 +693,9 @@ def iterate_on_specific_datapoint(
                         extraction_response = query_gpt4(
                             iteration_prompt.format(text=selected_row["text"])
                         )
-                        parsed_extraction = parse_gpt4_output(extraction_response)
+                        parsed_extraction = parse_gpt4_output_to_dict(
+                            extraction_response
+                        )
 
                         st.write(f"**Extracted Entities for {entity}:**")
                         st.json(parsed_extraction)
@@ -699,18 +730,28 @@ def iterate_on_specific_datapoint(
 
 
 def main() -> None:
-    """Main function to run the Streamlit app for extraction prompt iteration."""
+    """
+    Main function to run the Streamlit app for extraction prompt iteration.
+
+    This function sets up the page, loads data, displays the prompt development box,
+    and handles the preview and saving of prompts and extractions.
+    """
+    print("Starting Main")
     setup_page()
     logger, logging_level = setup_logging(__name__)
     df = load_data()
     display_evaluated_extractions(df)
-    baseline_prompt = load_prompt()
+
+    # Load the prompt (this will now use the session state to manage changes)
+    load_prompt()
 
     if st.session_state.get("selected_row_index", -1) >= 0:
-        iterate_on_specific_datapoint(df, baseline_prompt)
+        iterate_on_specific_datapoint(df, st.session_state.modified_prompts)
     else:
-        modified_prompts = display_prompt_dev_box(baseline_prompt)
+        # Use the modified prompts from session state in the development box
+        modified_prompts = display_prompt_dev_box(st.session_state.modified_prompts)
         st.session_state.modified_prompts = modified_prompts
+        print("st.session_state.modified_prompts", st.session_state.modified_prompts)
 
         model = st.selectbox(
             "Select a model", ["gpt-4o", "gpt-4o-2024-08-06", "gpt-4-turbo-preview"]
