@@ -135,27 +135,36 @@ def parse_auto_evaluation_response(result):
     return parsed_rational, parsed_result
 
 
-# Function to auto-evaluate responses
-def auto_evaluate_batch(batch):
+def auto_evaluate_batch(batch: List[Dict[str, Any]]) -> List[tuple]:
+    """
+    Processes a batch of rows to auto-evaluate LLM responses.
+
+    Args:
+        batch (List[Dict[str, Any]]): A list of rows (as dictionaries) to process.
+
+    Returns:
+        List[Tuple[int, str, str]]: A list of tuples containing the index, rationale, and result for each row.
+    """
     results = []
     for row in batch:
         logger.debug(f"Processing row with index {row['index']}")
-        if row["rating"] == "ACCEPT":
-            formated_prompt = AUTO_EVAL_EQUIVALENCE_PROMPT.format(
+        formatted_prompt = ""
+        if row.get("rating") == "ACCEPT":
+            formatted_prompt = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT.format(
                 old_response=row["response"],
                 new_response=row["new_response"],
                 question=row["question"],
             )
             logger.debug("Using ACCEPT prompt")
-        elif row["edited_gt"] != "":
-            formated_prompt = AUTO_EVAL_EQUIVALENCE_PROMPT.format(
+        elif row.get("edited_gt"):
+            formatted_prompt = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT.format(
                 old_response=row["edited_gt"],
                 new_response=row["new_response"],
                 question=row["question"],
             )
             logger.debug("Using edited_gt prompt")
-        elif row["sme_feedback"] != "":
-            formated_prompt = AUTO_EVAL_SME_FEEDBACK_PROMPT.format(
+        elif row.get("sme_feedback"):
+            formatted_prompt = LLM_AS_A_JUDGE_SME_FEEDBACK_PROMPT.format(
                 old_response=row["response"],
                 sme_feedback=row["sme_feedback"],
                 new_response=row["new_response"],
@@ -170,52 +179,76 @@ def auto_evaluate_batch(batch):
             continue
 
         logger.debug(f"Querying GPT-4 for row {row['index']}")
-        auto_evaluate_response = query_structured_gpt4(
-            formated_prompt, response_format=AutoEvaluationResult
-        )
-        rationale = (
-            f"SME Feedback: {row['sme_feedback']}\n\n" if row["sme_feedback"] else ""
-        )
-        rationale += auto_evaluate_response.rationale
-        results.append((row["index"], rationale, auto_evaluate_response.result))
-        logger.debug(
-            f"Processed row {row['index']} with result: {auto_evaluate_response.result}"
-        )
+        try:
+            auto_evaluate_response = query_structured_gpt4(
+                formatted_prompt, response_format=AutoEvaluationResult
+            )
+            rationale = (
+                f"SME Feedback: {row.get('sme_feedback')}\n\n"
+                if row.get("sme_feedback")
+                else ""
+            )
+            rationale += auto_evaluate_response.rationale
+            results.append((row["index"], rationale, auto_evaluate_response.result))
+            logger.debug(
+                f"Processed row {row['index']} with result: {auto_evaluate_response.result}"
+            )
+        except Exception as e:
+            logger.error(f"Error processing row {row['index']}: {e}")
+            results.append((row["index"], "", "ERROR"))
     return results
 
 
-def auto_evaluate_responses(df):
+def auto_evaluate_responses(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Auto-evaluate LLM responses in the DataFrame using parallel processing.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing the data to process.
+
+    Returns:
+        pd.DataFrame: The input DataFrame with added 'rationale' and 'auto_evaluation' columns.
+    """
     logger.info("Starting auto-evaluation process")
     batch_size = 2  # Adjust this based on your needs and rate limits
     num_workers = 5  # Adjust based on your CPU cores and rate limits
 
-    df = df.reset_index()  # Ensure we have an index column
-    batches = [df[i : i + batch_size] for i in range(0, len(df), batch_size)]
+    df = df.reset_index(drop=True)
+    df["index"] = df.index  # Ensure we have an index column
+
+    batches = [df.iloc[i : i + batch_size] for i in range(0, len(df), batch_size)]
     logger.info(f"Created {len(batches)} batches of size {batch_size}")
 
     progress_bar = st.progress(0)
     progress_text = st.empty()
 
     results = []
+    total_batches = len(batches)
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
         logger.info(f"Starting ThreadPoolExecutor with {num_workers} workers")
 
-        # Add ScriptRunContext to all threads in the pool
-        for t in executor._threads:
-            add_script_run_ctx(t)
+        # Prepare batch data
+        batch_data = [batch.to_dict("records") for batch in batches]
 
-        # Use executor.map to process batches
-        batch_results = executor.map(
-            auto_evaluate_batch, [batch.to_dict("records") for batch in batches]
-        )
+        # Submit tasks to the executor
+        future_to_batch_index = {
+            executor.submit(auto_evaluate_batch, batch): idx
+            for idx, batch in enumerate(batch_data)
+        }
 
-        for i, batch_result in enumerate(batch_results):
-            results.extend(batch_result)
-
-            logger.info(f"Completed batch {i+1}/{len(batches)}")
+        for i, future in enumerate(
+            concurrent.futures.as_completed(future_to_batch_index)
+        ):
+            batch_index = future_to_batch_index[future]
+            try:
+                batch_result = future.result()
+                results.extend(batch_result)
+                logger.info(f"Completed batch {batch_index + 1}/{total_batches}")
+            except Exception as exc:
+                logger.error(f"Batch {batch_index + 1} generated an exception: {exc}")
 
             # Update progress bar and text
-            progress = (i + 1) / len(batches)
+            progress = (i + 1) / total_batches
             progress_bar.progress(progress)
             progress_text.text(f"Auto Evaluation Progress: {int(progress * 100)}%")
 
@@ -223,18 +256,17 @@ def auto_evaluate_responses(df):
     progress_text.empty()
 
     logger.info("All batches processed, sorting results")
+    # Sort results by index
     results.sort(key=lambda x: x[0])
 
-    df["rationale"] = [result[1] for result in results]
-    df["auto_evaluation"] = [result[2] for result in results]
+    # Create mappings from results
+    index_to_rationale = {idx: rationale for idx, rationale, _ in results}
+    index_to_evaluation = {idx: evaluation for idx, _, evaluation in results}
 
-    df = df.set_index("index")  # Reset the index to its original state
+    # Add the results to the DataFrame
+    df["rationale"] = df["index"].map(index_to_rationale)
+    df["auto_evaluation"] = df["index"].map(index_to_evaluation)
+
+    df = df.drop(columns=["index"])  # Clean up the temporary index column
     logger.info("Auto-evaluation process completed")
     return df
-
-
-# Update the progress outside of the threaded execution
-def update_progress(current, total):
-    progress = current / total
-    st.progress(progress)
-    st.text(f"Auto Evaluation Progress: {int(progress * 100)}%")
