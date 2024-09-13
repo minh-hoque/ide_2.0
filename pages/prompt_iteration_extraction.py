@@ -8,6 +8,9 @@ import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 import html
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Dict, Any
+import concurrent.futures
 
 from css.style import apply_snorkel_style
 from helper.llms import query_gpt4
@@ -16,14 +19,13 @@ from prompts.extraction_prompts import EXTRACT_PROMPT
 
 # Constants for file paths
 STORAGE_DIR = "./storage"
-EXTRACTION_DATA_DIR = f"{STORAGE_DIR}/extraction_data"
-EXTRACTION_PROMPTS_DIR = f"{STORAGE_DIR}/extraction_prompts"
-EXTRACTION_RESULTS_DIR = f"{STORAGE_DIR}/extraction_results"
-PROMPT_MAPPING_FILE = f"{STORAGE_DIR}/extraction_prompt_mapping.json"
+EXTRACTION_DATA_DIR = os.path.join(STORAGE_DIR, "extraction_data")
+EXTRACTION_PROMPTS_DIR = os.path.join(STORAGE_DIR, "extraction_prompts")
+EXTRACTION_RESULTS_DIR = os.path.join(STORAGE_DIR, "extraction_results")
+PROMPT_MAPPING_FILE = os.path.join(STORAGE_DIR, "extraction_prompt_mapping.json")
 
-# Load environment variables and set up OpenAI client
+# Load environment variables
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Get a logger for this module
 logger = get_logger(__name__)
@@ -31,10 +33,10 @@ logger = get_logger(__name__)
 
 def setup_page() -> None:
     """
-    Set up the Streamlit page configuration.
+    Set up the Streamlit page configuration, including the page title, layout, custom CSS,
+    and the sidebar for prompt mode selection.
 
-    This function configures the page title, icon, layout, and adds custom CSS styling.
-    It also sets up the sidebar for prompt mode selection.
+    Also, initializes the 'prompt_mode' in session state.
     """
     st.set_page_config(
         page_title="Extraction Prompt Iteration", page_icon=":mag:", layout="wide"
@@ -46,13 +48,19 @@ def setup_page() -> None:
     )
     st.sidebar.title("Extraction Settings")
 
-    # Set up prompt mode selection in sidebar
+    # Prompt mode selection in sidebar with tooltip
     prompt_mode_tooltip = """
     Single: Use one prompt for all entities.
     Multi: Create separate prompts for each entity.
     """
+    if "prompt_mode" not in st.session_state:
+        st.session_state.prompt_mode = "Single"
+
     st.session_state.prompt_mode = st.sidebar.radio(
-        "Prompt Mode", ["Single", "Multi"], help=prompt_mode_tooltip
+        "Prompt Mode",
+        ["Single", "Multi"],
+        index=["Single", "Multi"].index(st.session_state.prompt_mode),
+        help=prompt_mode_tooltip,
     )
 
     if st.session_state.prompt_mode == "Multi":
@@ -63,20 +71,20 @@ def setup_entity_sidebar() -> None:
     """
     Set up the sidebar for entity input in Multi prompt mode.
 
-    This function allows users to input multiple entities for extraction
-    and stores them in the session state.
+    Allows users to input multiple entities for extraction and stores them in the session state.
     """
-    # Use session state to store and retrieve entities
+    # Initialize entities in session state if not present
     if "entities" not in st.session_state:
         st.session_state.entities = []
 
+    # Display text input for entities
     entities_input = st.sidebar.text_input(
         "Enter entities (comma-separated)",
         value=", ".join(st.session_state.entities),
         key="entities_input",
     )
 
-    # Only update entities if the input has changed
+    # Update entities in session state if the input has changed
     new_entities = [
         entity.strip() for entity in entities_input.split(",") if entity.strip()
     ]
@@ -94,6 +102,7 @@ def load_data() -> pd.DataFrame:
     Raises:
         SystemExit: If no CSV files are found or no file is selected.
     """
+    # List CSV files in the data directory
     csv_files = [f for f in os.listdir(EXTRACTION_DATA_DIR) if f.endswith(".csv")]
 
     if not csv_files:
@@ -259,9 +268,10 @@ def parse_gpt4_output_to_dict(output: Optional[str]) -> Dict[str, List[str]]:
     Returns:
         Dict[str, List[str]]: A dictionary of parsed entities and their values.
     """
-    if output is None:
+    if not output:
         return {}
 
+    # Extract JSON content from markdown code block if present
     json_match = re.search(r"```json\s*(.*?)\s*```", output, re.DOTALL)
     json_str = json_match.group(1) if json_match else output
 
@@ -271,54 +281,87 @@ def parse_gpt4_output_to_dict(output: Optional[str]) -> Dict[str, List[str]]:
         logger.error(f"Error parsing GPT-4 output: {output}")
         return {}
 
-    return {k: v if isinstance(v, list) else [v] for k, v in parsed_output.items()}
+    # Ensure that values are lists
+    parsed_dict = {
+        k: v if isinstance(v, list) else [v] for k, v in parsed_output.items()
+    }
+    return parsed_dict
+
+
+def process_batch(
+    batch: List[Dict[str, Any]],
+    modified_prompts: Dict[str, str],
+    model: str,
+    prompt_mode: str,
+) -> List[Dict[str, List[str]]]:
+    extractions = []
+    for row in batch:
+        extraction = {}
+        if prompt_mode == "Single":
+            formatted_prompt = modified_prompts["all"].format(text=row["text"])
+            extraction_response = query_gpt4(formatted_prompt)
+            extraction = parse_gpt4_output_to_dict(extraction_response or "")
+        else:
+            for entity, prompt in modified_prompts.items():
+                formatted_prompt = prompt.format(text=row["text"])
+                extraction_response = query_gpt4(formatted_prompt, model=model)
+                entity_extraction = parse_gpt4_output_to_dict(extraction_response or "")
+                extraction.update(entity_extraction)
+        extractions.append(extraction)
+    return extractions
 
 
 def generate_extractions(
     df: pd.DataFrame, modified_prompts: Dict[str, str], model: str
 ) -> List[Dict[str, List[str]]]:
-    """
-    Generate extractions using the modified prompts for each row in the dataframe.
+    logger.info("Starting extraction generation process")
+    batch_size = 1  # Adjust this based on your needs and rate limits
+    num_workers = 5  # Adjust based on your CPU cores and rate limits
 
-    Args:
-        df (pd.DataFrame): The input dataframe containing texts to extract from.
-        modified_prompts (Dict[str, str]): The prompts to use for extraction.
-        model (str): The name of the model to use.
+    prompt_mode = (
+        st.session_state.prompt_mode
+    )  # Get prompt_mode from session state here
 
-    Returns:
-        List[Dict[str, List[str]]]: A list of extraction results.
-    """
-    extractions = []
+    batches = [
+        df[i : i + batch_size].to_dict("records") for i in range(0, len(df), batch_size)
+    ]
+    logger.info(f"Created {len(batches)} batches of size {batch_size}")
+
     progress_bar = st.progress(0)
     progress_text = st.empty()
-    total_rows = len(df)
 
-    for index, row in df.iterrows():
-        logger.info(f"Extraction for index {index}")
-        text = row["text"]
-        extraction = {}
+    all_extractions = []
+    with ThreadPoolExecutor(max_workers=num_workers) as executor:
+        logger.info(f"Starting ThreadPoolExecutor with {num_workers} workers")
 
-        if st.session_state.prompt_mode == "Single":
-            formatted_prompt = modified_prompts["all"].format(text=text)
-            extraction_response = query_gpt4(formatted_prompt)
-            extraction = parse_gpt4_output_to_dict(extraction_response or "")
-        else:
-            for entity, prompt in modified_prompts.items():
-                print(entity, prompt)
-                formatted_prompt = prompt.format(text=text)
-                extraction_response = query_gpt4(formatted_prompt)
-                entity_extraction = parse_gpt4_output_to_dict(extraction_response or "")
-                extraction.update(entity_extraction)
+        # Use executor.map to process batches
+        batch_results = executor.map(
+            process_batch,
+            batches,
+            [modified_prompts] * len(batches),
+            [model] * len(batches),
+            [prompt_mode] * len(batches),  # Pass prompt_mode to each batch
+        )
 
-        extractions.append(extraction)
+        for i, batch_extraction in enumerate(batch_results):
+            try:
+                all_extractions.extend(batch_extraction)
 
-        progress = float(index + 1) / float(total_rows)
-        progress_bar.progress(progress)
-        progress_text.text(f"Generating extractions: {index + 1}/{total_rows}")
+                logger.info(f"Completed batch {i+1}/{len(batches)}")
+
+                # Update progress bar and text
+                progress = (i + 1) / len(batches)
+                progress_bar.progress(progress)
+                progress_text.text(f"Generating extractions: {i + 1}/{len(batches)}")
+            except Exception as exc:
+                logger.error(f"Batch {i+1} generated an exception: {exc}")
 
     progress_bar.empty()
     progress_text.empty()
-    return extractions
+
+    logger.info("All batches processed")
+    logger.info("Extraction generation process completed")
+    return all_extractions
 
 
 def calculate_metrics(
