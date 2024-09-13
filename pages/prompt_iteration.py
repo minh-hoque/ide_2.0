@@ -287,14 +287,14 @@ def display_metrics(current_metrics: Dict[str, float]) -> None:
     def get_delta(
         current: Dict[str, float], previous: Dict[str, float], key: str
     ) -> Tuple[Optional[str], Optional[str]]:
+        delta_color = "normal"
         if previous and key in previous:
             delta = current[key] - previous[key]
             delta_str = f"{delta:+.2f}%"
-            delta_color = "normal"
             if key == "regression_percentage":
                 delta_color = "inverse"  # Use 'inverse' for regressions
             return delta_str, delta_color
-        return None, None
+        return None, delta_color
 
     metrics_config = [
         (
@@ -381,7 +381,6 @@ def generate_new_responses(
         logger.info(f"Inference index {index}")
         question = row["question"]
         formatted_prompt = modified_prompt.format(user_question=question)
-        print(formatted_prompt)
         response = query_gpt4(formatted_prompt, model=model)
         new_responses.append(response)
 
@@ -642,7 +641,7 @@ def main() -> None:
         st.session_state.modified_prompt = (
             modified_prompt  # Store the modified prompt in session state
         )
-        print(modified_prompt)
+        # print(modified_prompt)
         preview_prompt(df, modified_prompt, model)
         save_prompt_and_responses()  # Replace send_for_sme_evaluation with this new function
 

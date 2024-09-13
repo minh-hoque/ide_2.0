@@ -25,6 +25,9 @@ from tenacity import (
     stop_after_attempt,
     retry_if_exception_type,
 )
+import concurrent.futures
+from functools import partial
+from streamlit.runtime.scriptrunner import add_script_run_ctx
 
 # Load environment variables and set up OpenAI client
 load_dotenv()
@@ -133,32 +136,24 @@ def parse_auto_evaluation_response(result):
 
 
 # Function to auto-evaluate responses
-def auto_evaluate_responses(df):
-    rational_list = []
-    auto_evaluation_results = []
-    progress_bar = st.progress(0)
-    progress_text = st.empty()
-
-    for index, row in df.iterrows():
-        progress = (index + 1) / len(df)
-        progress_bar.progress(progress)
-        progress_text.text(f"Auto Evaluation Progress: {int(progress * 100)}%")
-
-        logger.info(f"Auto Evaluation Question {index + 1}")
-        logger.debug(f"Question: {row['question']}")
-
+def auto_evaluate_batch(batch):
+    results = []
+    for row in batch:
+        logger.debug(f"Processing row with index {row['index']}")
         if row["rating"] == "ACCEPT":
             formated_prompt = AUTO_EVAL_EQUIVALENCE_PROMPT.format(
                 old_response=row["response"],
                 new_response=row["new_response"],
                 question=row["question"],
             )
+            logger.debug("Using ACCEPT prompt")
         elif row["edited_gt"] != "":
             formated_prompt = AUTO_EVAL_EQUIVALENCE_PROMPT.format(
                 old_response=row["edited_gt"],
                 new_response=row["new_response"],
                 question=row["question"],
             )
+            logger.debug("Using edited_gt prompt")
         elif row["sme_feedback"] != "":
             formated_prompt = AUTO_EVAL_SME_FEEDBACK_PROMPT.format(
                 old_response=row["response"],
@@ -166,37 +161,80 @@ def auto_evaluate_responses(df):
                 new_response=row["new_response"],
                 question=row["question"],
             )
+            logger.debug("Using SME feedback prompt")
         else:
-            auto_evaluation_results.append("UNKNOWN")
-            rational_list.append("")
-            logger.warning("No edited ground truth or SME feedback available.")
-            logger.info("Auto Evaluation: N/A")
+            logger.warning(
+                f"No valid prompt found for row {row['index']}, marking as UNKNOWN"
+            )
+            results.append((row["index"], "", "UNKNOWN"))
             continue
 
+        logger.debug(f"Querying GPT-4 for row {row['index']}")
         auto_evaluate_response = query_structured_gpt4(
             formated_prompt, response_format=AutoEvaluationResult
         )
-        logger.debug(f"LLM Response:\n{auto_evaluate_response}")
-
         rationale = (
             f"SME Feedback: {row['sme_feedback']}\n\n" if row["sme_feedback"] else ""
         )
         rationale += auto_evaluate_response.rationale
+        results.append((row["index"], rationale, auto_evaluate_response.result))
+        logger.debug(
+            f"Processed row {row['index']} with result: {auto_evaluate_response.result}"
+        )
+    return results
 
-        auto_evaluation = auto_evaluate_response.result
 
-        rational_list.append(rationale)
-        auto_evaluation_results.append(auto_evaluation)
-        logger.debug(f"Old Response:\n{row['response']}")
-        logger.debug(f"New Response:\n{row['new_response']}")
-        logger.info(f"Auto Evaluation: {auto_evaluation}")
+def auto_evaluate_responses(df):
+    logger.info("Starting auto-evaluation process")
+    batch_size = 2  # Adjust this based on your needs and rate limits
+    num_workers = 5  # Adjust based on your CPU cores and rate limits
 
-        logger.info("-----------------------------------")
+    df = df.reset_index()  # Ensure we have an index column
+    batches = [df[i : i + batch_size] for i in range(0, len(df), batch_size)]
+    logger.info(f"Created {len(batches)} batches of size {batch_size}")
+
+    progress_bar = st.progress(0)
+    progress_text = st.empty()
+
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+        logger.info(f"Starting ThreadPoolExecutor with {num_workers} workers")
+
+        # Add ScriptRunContext to all threads in the pool
+        for t in executor._threads:
+            add_script_run_ctx(t)
+
+        # Use executor.map to process batches
+        batch_results = executor.map(
+            auto_evaluate_batch, [batch.to_dict("records") for batch in batches]
+        )
+
+        for i, batch_result in enumerate(batch_results):
+            results.extend(batch_result)
+
+            logger.info(f"Completed batch {i+1}/{len(batches)}")
+
+            # Update progress bar and text
+            progress = (i + 1) / len(batches)
+            progress_bar.progress(progress)
+            progress_text.text(f"Auto Evaluation Progress: {int(progress * 100)}%")
 
     progress_bar.empty()
     progress_text.empty()
 
-    df["auto_evaluation"] = auto_evaluation_results
-    df["rationale"] = rational_list
+    logger.info("All batches processed, sorting results")
+    results.sort(key=lambda x: x[0])
 
+    df["rationale"] = [result[1] for result in results]
+    df["auto_evaluation"] = [result[2] for result in results]
+
+    df = df.set_index("index")  # Reset the index to its original state
+    logger.info("Auto-evaluation process completed")
     return df
+
+
+# Update the progress outside of the threaded execution
+def update_progress(current, total):
+    progress = current / total
+    st.progress(progress)
+    st.text(f"Auto Evaluation Progress: {int(progress * 100)}%")
