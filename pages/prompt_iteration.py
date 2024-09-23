@@ -46,33 +46,60 @@ def load_data() -> pd.DataFrame:
     Returns:
         pd.DataFrame: Preprocessed dataframe containing evaluated responses.
     """
-    eval_files = [
-        f for f in os.listdir(MANUAL_ANNOTATIONS_DIR) if f.endswith("evaluated.csv")
-    ]
+    st.subheader("Load Data")
 
-    if not eval_files:
-        st.error(
-            "No evaluated responses found. Please complete manual annotations first."
+    data_source = st.radio(
+        "Choose data source:", ["Select from existing files", "Upload a CSV file"]
+    )
+
+    if data_source == "Select from existing files":
+        eval_files = [
+            f for f in os.listdir(MANUAL_ANNOTATIONS_DIR) if f.endswith("evaluated.csv")
+        ]
+
+        if not eval_files:
+            st.error(
+                "No evaluated responses found. Please complete manual annotations first."
+            )
+            st.stop()
+
+        selected_file = st.selectbox(
+            "Select evaluated responses file:", ["-"] + eval_files
         )
-        st.stop()
 
-    selected_file = st.selectbox("Select evaluated responses file:", ["-"] + eval_files)
+        if selected_file == "-":
+            st.error("No file selected. Please try again.")
+            st.stop()
 
-    if selected_file == "-":
-        st.error("No file selected. Please try again.")
-        st.stop()
+        try:
+            df = pd.read_csv(
+                os.path.join(MANUAL_ANNOTATIONS_DIR, selected_file),
+                na_values=["", "nan", "NaN", "None"],
+                keep_default_na=True,
+            )
+        except FileNotFoundError:
+            logger.error(f"Selected file {selected_file} not found.")
+            st.error(f"Selected file {selected_file} not found. Please try again.")
+            st.stop()
 
-    try:
-        df = pd.read_csv(
-            os.path.join(MANUAL_ANNOTATIONS_DIR, selected_file),
-            na_values=["", "nan", "NaN", "None"],
-            keep_default_na=True,
-        )
-        return preprocess_dataframe(df)
-    except FileNotFoundError:
-        logger.error(f"Selected file {selected_file} not found.")
-        st.error(f"Selected file {selected_file} not found. Please try again.")
-        st.stop()
+    else:  # Upload a CSV file
+        uploaded_file = st.file_uploader("Upload a CSV file", type="csv")
+        if uploaded_file is not None:
+            try:
+                df = pd.read_csv(
+                    uploaded_file,
+                    na_values=["", "nan", "NaN", "None"],
+                    keep_default_na=True,
+                )
+            except Exception as e:
+                logger.error(f"Error reading uploaded file: {str(e)}")
+                st.error(f"Error reading uploaded file: {str(e)}")
+                st.stop()
+        else:
+            st.info("Please upload a CSV file.")
+            st.stop()
+
+    return preprocess_dataframe(df)
 
 
 def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
