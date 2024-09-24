@@ -174,3 +174,36 @@ __pycache__/
 # Ignore __pycache__ directories and .pyc files in all subdirectories
 **/__pycache__/
 **/*.pyc
+
+# Node.js / React
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+
+# React build output
+/build
+
+# React environment files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# React coverage directory
+/coverage
+
+# React misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# React editor directories and files
+.vscode/
+*.swp
+*.swo
+prompt-development-app/
