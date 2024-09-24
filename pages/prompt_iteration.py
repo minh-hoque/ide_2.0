@@ -9,7 +9,7 @@ from openai import OpenAI
 from streamlit.delta_generator import DeltaGenerator
 
 from css.style import apply_snorkel_style
-from helper.llms import query_gpt4, auto_evaluate_responses
+from helper.llms import query_llm, auto_evaluate_responses
 from helper.logging import get_logger, setup_logging
 from prompts.base_prompts import BASELINE_PROMPT
 
@@ -408,7 +408,7 @@ def generate_new_responses(
         logger.info(f"Inference index {index}")
         question = row["question"]
         formatted_prompt = modified_prompt.format(user_question=question)
-        response = query_gpt4(formatted_prompt, model=model)
+        response = query_llm(formatted_prompt, model=model)
         new_responses.append(response)
 
         progress = float(index + 1) / float(total_rows)
@@ -621,7 +621,7 @@ def iterate_on_specific_question(
     if st.button("Generate New Response", key="generate_specific"):
         with st.spinner("Generating response..."):
             formatted_prompt = modified_prompt.format(user_question=question)
-            new_response = query_gpt4(formatted_prompt, model=model)
+            new_response = query_llm(formatted_prompt, model=model)
 
         st.markdown("### New Response")
         st.markdown(new_response)

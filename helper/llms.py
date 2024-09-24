@@ -65,15 +65,9 @@ class ExtractionResult(BaseModel):
     ),
 )
 @st.cache_data
-def query_gpt4(prompt, system_prompt="", model="gpt-4o", json_response=False):
+def query_llm(prompt: str, model: str = "gpt-4o", json_response=False) -> str:
     try:
         messages = [ChatCompletionUserMessageParam(role="user", content=prompt)]
-        if system_prompt:
-            messages.insert(
-                0,
-                ChatCompletionSystemMessageParam(role="system", content=system_prompt),
-            )
-
         response_format = {"type": "json_object"} if json_response else None
         response = client.chat.completions.create(
             model=model,
