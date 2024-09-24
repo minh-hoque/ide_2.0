@@ -1,4 +1,4 @@
-# Prompt Development Workflow
+# IDE 2.0 - Prompt Development Workflow
 
 This project implements a Streamlit-based application for iterative prompt development and evaluation in AI-powered question-answering and entity extraction systems. It allows users to load evaluated responses, modify prompts, preview new responses, and send them for Subject Matter Expert (SME) evaluation.
 
