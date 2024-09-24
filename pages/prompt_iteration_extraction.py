@@ -13,7 +13,7 @@ from typing import List, Dict, Any
 import concurrent.futures
 
 from css.style import apply_snorkel_style
-from helper.llms import query_gpt4
+from helper.llms import query_llm
 from helper.logging import get_logger, setup_logging
 from prompts.extraction_prompts import EXTRACT_PROMPT
 
@@ -102,28 +102,52 @@ def load_data() -> pd.DataFrame:
     Raises:
         SystemExit: If no CSV files are found or no file is selected.
     """
-    # List CSV files in the data directory
-    csv_files = [f for f in os.listdir(EXTRACTION_DATA_DIR) if f.endswith(".csv")]
+    st.subheader("Load Data")
 
-    if not csv_files:
-        st.error("No CSV files found in the extraction_data directory.")
-        st.stop()
+    data_source = st.radio(
+        "Choose data source:", ["Select from existing files", "Upload a CSV file"]
+    )
 
-    selected_file = st.selectbox("Select CSV file:", ["-"] + csv_files)
+    if data_source == "Select from existing files":
+        # List CSV files in the data directory
+        csv_files = [f for f in os.listdir(EXTRACTION_DATA_DIR) if f.endswith(".csv")]
 
-    if selected_file == "-":
-        st.error("No file selected. Please try again.")
-        st.stop()
+        if not csv_files:
+            st.error("No CSV files found in the extraction_data directory.")
+            st.stop()
 
-    file_path = os.path.join(EXTRACTION_DATA_DIR, selected_file)
-    try:
-        df = pd.read_csv(file_path)
-        st.session_state.df = df  # Store df in session state for later use
-        return df
-    except Exception as e:
-        logger.error(f"Error loading file {selected_file}: {str(e)}")
-        st.error(f"Error loading file {selected_file}. Please check the file format.")
-        st.stop()
+        selected_file = st.selectbox("Select CSV file:", ["-"] + csv_files)
+
+        if selected_file == "-":
+            st.error("No file selected. Please try again.")
+            st.stop()
+
+        file_path = os.path.join(EXTRACTION_DATA_DIR, selected_file)
+        try:
+            df = pd.read_csv(file_path)
+            st.session_state.df = df  # Store df in session state for later use
+            return df
+        except Exception as e:
+            logger.error(f"Error loading file {selected_file}: {str(e)}")
+            st.error(
+                f"Error loading file {selected_file}. Please check the file format."
+            )
+            st.stop()
+    else:  # Upload a CSV file
+        uploaded_file = st.file_uploader("Upload a CSV file", type="csv")
+        if uploaded_file is not None:
+            try:
+                df = pd.read_csv(uploaded_file)
+                st.session_state.df = df  # Store df in session state for later use
+            except Exception as e:
+                logger.error(f"Error reading uploaded file: {str(e)}")
+                st.error(f"Error reading uploaded file: {str(e)}")
+                st.stop()
+        else:
+            st.info("Please upload a CSV file.")
+            st.stop()
+
+    return df
 
 
 def list_saved_prompts() -> List[str]:
@@ -299,12 +323,12 @@ def process_batch(
         extraction = {}
         if prompt_mode == "Single":
             formatted_prompt = modified_prompts["all"].format(text=row["text"])
-            extraction_response = query_gpt4(formatted_prompt)
+            extraction_response = query_llm(formatted_prompt)
             extraction = parse_gpt4_output_to_dict(extraction_response or "")
         else:
             for entity, prompt in modified_prompts.items():
                 formatted_prompt = prompt.format(text=row["text"])
-                extraction_response = query_gpt4(formatted_prompt, model=model)
+                extraction_response = query_llm(formatted_prompt, model=model)
                 entity_extraction = parse_gpt4_output_to_dict(extraction_response or "")
                 extraction.update(entity_extraction)
         extractions.append(extraction)
@@ -501,7 +525,7 @@ def preview_prompt(
 
 def display_preview_results(df: pd.DataFrame, extractions: List[Dict]) -> None:
     """
-    Display the results of the preview.
+    Display the results of the preview with an option to filter responses with errors.
 
     Args:
         df (pd.DataFrame): The input dataframe.
@@ -509,11 +533,24 @@ def display_preview_results(df: pd.DataFrame, extractions: List[Dict]) -> None:
     """
     st.write("Extractions generated with the modified prompt:")
 
+    # Add a checkbox to filter responses with errors
+    show_only_errors = st.checkbox("Show only responses with errors", value=False)
+
     for i, (_, row) in enumerate(df.iterrows()):
+        # Get ground truth and calculate metrics for this example
+        ground_truth = row["ground_truth"]
+        metrics = calculate_example_metrics(ground_truth, extractions[i])
+
+        # Determine if there are errors in this example
+        has_error = any(
+            entity_metrics["f1"] < 1.0 for entity_metrics in metrics.values()
+        )
+
+        # Skip examples without errors if the checkbox is checked
+        if show_only_errors and not has_error:
+            continue
+
         with st.expander(f"Example {i+1}"):
-            # ground_truth = json.loads(row["ground_truth"])
-            ground_truth = row["ground_truth"]
-            metrics = calculate_example_metrics(ground_truth, extractions[i])
             st.markdown("### Entity Metrics")
             table_rows = [
                 f"| {entity} | {scores['precision']:.2f} | {scores['recall']:.2f} | {scores['f1']:.2f} |"
@@ -534,8 +571,6 @@ def display_preview_results(df: pd.DataFrame, extractions: List[Dict]) -> None:
 
             st.write("**Extracted:**")
             st.json(extractions[i])
-
-            st.write("**Entity-level Metrics:**")
 
 
 def save_prompt_and_extractions() -> None:
@@ -734,7 +769,7 @@ def iterate_on_specific_datapoint(
 
 def run_extraction_for_entity(prompt: str, text: str, entity: str) -> None:
     if st.button(f"Run Extraction for {entity}"):
-        extraction_response = query_gpt4(prompt.format(text=text))
+        extraction_response = query_llm(prompt.format(text=text))
         parsed_extraction = parse_gpt4_output_to_dict(extraction_response or "")
 
         st.write(f"**Extracted Entities for {entity}:**")
