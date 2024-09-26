@@ -453,7 +453,7 @@ def calculate_metrics(
     return {"overall": overall_metrics, "entity_metrics": entity_metrics}
 
 
-def calculate_example_metrics(
+def calculate_single_example_metrics(
     ground_truth: Dict[str, List[str]], extraction: Dict[str, List[str]]
 ) -> Dict[str, Dict[str, float]]:
     """
@@ -547,7 +547,7 @@ def filter_and_display_results(
     filtered_results = []
     for i, (_, row) in enumerate(df.iterrows()):
         ground_truth = row["ground_truth"]
-        metrics = calculate_example_metrics(ground_truth, extractions[i])
+        metrics = calculate_single_example_metrics(ground_truth, extractions[i])
         has_error = any(
             entity_metrics["f1"] < 1.0 for entity_metrics in metrics.values()
         )
@@ -793,18 +793,30 @@ def run_extraction_for_entity(prompt: str, text: str, entity: str) -> None:
         st.write(f"**Extracted Entities for {entity}:**")
         st.json(parsed_extraction)
 
-        entity_metrics = calculate_example_metrics(
+        entity_metrics = calculate_single_example_metrics(
             json.loads(st.session_state.filtered_df.iloc[0]["ground_truth"]),
             parsed_extraction,
         )
         st.markdown(f"#### Metrics for {entity}")
-        st.markdown(
-            format_metrics_markdown(
-                entity_metrics[entity]["precision"],
-                entity_metrics[entity]["recall"],
-                entity_metrics[entity]["f1"],
+        print("entity_metrics", entity_metrics)
+        if entity == "all":
+            for entity in entity_metrics:
+                st.markdown(f"###### Metrics for {entity}")
+                st.markdown(
+                    format_metrics_markdown(
+                        entity_metrics[entity]["precision"],
+                        entity_metrics[entity]["recall"],
+                        entity_metrics[entity]["f1"],
+                    )
+                )
+        else:
+            st.markdown(
+                format_metrics_markdown(
+                    entity_metrics[entity]["precision"],
+                    entity_metrics[entity]["recall"],
+                    entity_metrics[entity]["f1"],
+                )
             )
-        )
 
 
 def main() -> None:
@@ -843,10 +855,18 @@ def main() -> None:
             if "show_only_errors" not in st.session_state:
                 st.session_state.show_only_errors = False
 
-            # Use session state for the checkbox
-            st.session_state.show_only_errors = st.checkbox(
+            # Define a callback function for the checkbox
+            def on_checkbox_change():
+                st.session_state.show_only_errors = (
+                    not st.session_state.show_only_errors
+                )
+
+            # Use the callback for the checkbox
+            st.checkbox(
                 "Show only responses with errors",
                 value=st.session_state.show_only_errors,
+                on_change=on_checkbox_change,
+                key="error_checkbox",
             )
 
             # Filter and display results
