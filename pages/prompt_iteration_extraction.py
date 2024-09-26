@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import html
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import concurrent.futures
 
 from css.style import apply_snorkel_style
@@ -516,40 +516,59 @@ def preview_prompt(
     """
     if st.button("Preview Prompt"):
         extractions = generate_extractions(df, modified_prompts, model)
-        metrics = calculate_metrics(df["ground_truth"].tolist(), extractions)
-        display_metrics(metrics)
-        display_preview_results(df, extractions)
         st.session_state.extractions = extractions
-        st.session_state.metrics = metrics
+        st.session_state.preview_generated = True
 
 
-def display_preview_results(df: pd.DataFrame, extractions: List[Dict]) -> None:
+def calculate_and_display_metrics(df: pd.DataFrame, extractions: List[Dict]) -> None:
     """
-    Display the results of the preview with an option to filter responses with errors.
+    Calculate and display metrics for the extractions.
 
     Args:
         df (pd.DataFrame): The input dataframe.
         extractions (List[Dict]): The list of extraction results.
     """
-    st.write("Extractions generated with the modified prompt:")
+    metrics = calculate_metrics(df["ground_truth"].tolist(), extractions)
+    display_metrics(metrics)
+    st.session_state.metrics = metrics
 
-    # Add a checkbox to filter responses with errors
-    show_only_errors = st.checkbox("Show only responses with errors", value=False)
 
+def filter_and_display_results(
+    df: pd.DataFrame, extractions: List[Dict], show_only_errors: bool
+) -> None:
+    """
+    Filter results based on errors and display them.
+
+    Args:
+        df (pd.DataFrame): The input dataframe.
+        extractions (List[Dict]): The list of extraction results.
+        show_only_errors (bool): Whether to show only responses with errors.
+    """
+    filtered_results = []
     for i, (_, row) in enumerate(df.iterrows()):
-        # Get ground truth and calculate metrics for this example
         ground_truth = row["ground_truth"]
         metrics = calculate_example_metrics(ground_truth, extractions[i])
-
-        # Determine if there are errors in this example
         has_error = any(
             entity_metrics["f1"] < 1.0 for entity_metrics in metrics.values()
         )
 
-        # Skip examples without errors if the checkbox is checked
-        if show_only_errors and not has_error:
-            continue
+        if not show_only_errors or has_error:
+            filtered_results.append((i, row, extractions[i], metrics))
 
+    st.session_state.filtered_results = filtered_results
+    display_preview_results(filtered_results)
+
+
+def display_preview_results(filtered_results: List[Tuple]) -> None:
+    """
+    Display the filtered preview results.
+
+    Args:
+        filtered_results (List[Tuple]): List of filtered results to display.
+    """
+    st.write("Extractions generated with the modified prompt:")
+
+    for i, row, extraction, metrics in filtered_results:
         with st.expander(f"Example {i+1}"):
             st.markdown("### Entity Metrics")
             table_rows = [
@@ -562,15 +581,14 @@ def display_preview_results(df: pd.DataFrame, extractions: List[Dict]) -> None:
             st.markdown(table_content)
 
             st.write("**Text:**")
-            # Decode and unescape HTML entities
             cleaned_text = html.unescape(row["text"])
             st.text(cleaned_text)
 
             st.write("**Ground Truth:**")
-            st.json(ground_truth)
+            st.json(row["ground_truth"])
 
             st.write("**Extracted:**")
-            st.json(extractions[i])
+            st.json(extraction)
 
 
 def save_prompt_and_extractions() -> None:
@@ -792,9 +810,6 @@ def run_extraction_for_entity(prompt: str, text: str, entity: str) -> None:
 def main() -> None:
     """
     Main function to run the Streamlit app for extraction prompt iteration.
-
-    This function sets up the page, loads data, displays the prompt development box,
-    and handles the preview and saving of prompts and extractions.
     """
     print("Starting Main")
     setup_page()
@@ -802,7 +817,7 @@ def main() -> None:
     df = load_data()
     display_evaluated_extractions(df)
 
-    # Load the prompt (this will now use the session state to manage changes)
+    # Load the prompt (managed via session state)
     load_prompt()
 
     if st.session_state.get("selected_row_index", -1) >= 0:
@@ -818,6 +833,27 @@ def main() -> None:
         )
 
         preview_prompt(df, modified_prompts, model)
+
+        # Check if preview has been generated
+        if st.session_state.get("preview_generated", False):
+            # Calculate and display metrics
+            calculate_and_display_metrics(df, st.session_state.extractions)
+
+            # Initialize show_only_errors in session state if not present
+            if "show_only_errors" not in st.session_state:
+                st.session_state.show_only_errors = False
+
+            # Use session state for the checkbox
+            st.session_state.show_only_errors = st.checkbox(
+                "Show only responses with errors",
+                value=st.session_state.show_only_errors,
+            )
+
+            # Filter and display results
+            filter_and_display_results(
+                df, st.session_state.extractions, st.session_state.show_only_errors
+            )
+
         save_prompt_and_extractions()
 
 
