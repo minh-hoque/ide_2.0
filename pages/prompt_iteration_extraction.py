@@ -182,59 +182,63 @@ def load_prompt() -> Union[str, Dict[str, str]]:
     if "last_selected_prompt" not in st.session_state:
         st.session_state.last_selected_prompt = prompt_list[0]
 
-    print(
-        "st.session_state.last_selected_prompt", st.session_state.last_selected_prompt
-    )
+    # Define a callback function for the selectbox
+    def on_prompt_change():
+        selected_prompt = st.session_state.prompt_selector
+        if selected_prompt != st.session_state.last_selected_prompt:
+            st.session_state.last_selected_prompt = selected_prompt
+            load_selected_prompt(selected_prompt)
 
-    # Check if the last selected prompt is still in the list
-    if st.session_state.last_selected_prompt not in prompt_list:
-        st.session_state.last_selected_prompt = prompt_list[0]
-
+    # Use the callback for the selectbox
     selected_prompt = st.sidebar.selectbox(
         "Select a saved prompt:",
         prompt_list,
         index=prompt_list.index(st.session_state.last_selected_prompt),
         key="prompt_selector",
+        on_change=on_prompt_change,
     )
 
-    print("selected_prompt", selected_prompt)
-
-    # Load the prompt if it's the first time or if the selection has changed
-    if (
-        "modified_prompts" not in st.session_state
-        or st.session_state.last_selected_prompt != selected_prompt
-    ):
-        st.session_state.last_selected_prompt = selected_prompt
-
-        if selected_prompt == "Current Baseline":
-            loaded_prompt = (
-                EXTRACT_PROMPT
-                if st.session_state.prompt_mode == "Single"
-                else {entity: EXTRACT_PROMPT for entity in st.session_state.entities}
-            )
-        else:
-            try:
-                file_path = os.path.join(EXTRACTION_PROMPTS_DIR, selected_prompt)
-                if st.session_state.prompt_mode == "Multi":
-                    with open(file_path, "r") as f:
-                        loaded_data = json.load(f)
-                    st.session_state.entities = loaded_data["entities"]
-                    loaded_prompt = loaded_data["prompts"]
-                else:
-                    with open(file_path, "r") as f:
-                        loaded_prompt = f.read()
-
-            except FileNotFoundError:
-                logger.error(f"Selected prompt file {selected_prompt} not found.")
-                st.sidebar.error(
-                    f"Selected prompt file {selected_prompt} not found. Using default prompt."
-                )
-                loaded_prompt = "Extract the following entities from the text: {entities}\n\nText: {text}\n\nExtracted entities:"
-
-        # Update the session state with the newly loaded prompt
-        st.session_state.modified_prompts = loaded_prompt
+    # If it's the first time or if we haven't loaded the prompt yet, load it now
+    if "modified_prompts" not in st.session_state:
+        load_selected_prompt(selected_prompt)
 
     return st.session_state.modified_prompts
+
+
+def load_selected_prompt(selected_prompt: str) -> None:
+    """
+    Load the selected prompt and update the session state.
+
+    Args:
+        selected_prompt (str): The name of the selected prompt file.
+    """
+    if selected_prompt == "Current Baseline":
+        loaded_prompt = (
+            EXTRACT_PROMPT
+            if st.session_state.prompt_mode == "Single"
+            else {entity: EXTRACT_PROMPT for entity in st.session_state.entities}
+        )
+    else:
+        try:
+            file_path = os.path.join(EXTRACTION_PROMPTS_DIR, selected_prompt)
+            if st.session_state.prompt_mode == "Multi":
+                with open(file_path, "r") as f:
+                    loaded_data = json.load(f)
+                st.session_state.entities = loaded_data["entities"]
+                loaded_prompt = loaded_data["prompts"]
+            else:
+                with open(file_path, "r") as f:
+                    loaded_prompt = f.read()
+
+        except FileNotFoundError:
+            logger.error(f"Selected prompt file {selected_prompt} not found.")
+            st.sidebar.error(
+                f"Selected prompt file {selected_prompt} not found. Using default prompt."
+            )
+            loaded_prompt = "Extract the following entities from the text: {entities}\n\nText: {text}\n\nExtracted entities:"
+
+    # Update the session state with the newly loaded prompt
+    st.session_state.modified_prompts = loaded_prompt
 
 
 def display_prompt_dev_box(prompt: Union[str, Dict[str, str]]) -> Dict[str, str]:

@@ -202,22 +202,57 @@ def load_prompt() -> str:
     """
     st.sidebar.markdown("## Load Saved Prompt")
     saved_prompts = load_saved_prompts()
+    prompt_list = ["Current Baseline"] + saved_prompts
+
+    # Initialize last_selected_prompt if it doesn't exist
+    if "last_selected_prompt" not in st.session_state:
+        st.session_state.last_selected_prompt = prompt_list[0]
+
+    # Define a callback function for the selectbox
+    def on_prompt_change():
+        selected_prompt = st.session_state.prompt_selector
+        if selected_prompt != st.session_state.last_selected_prompt:
+            st.session_state.last_selected_prompt = selected_prompt
+            load_selected_prompt(selected_prompt)
+
+    # Use the callback for the selectbox
     selected_prompt = st.sidebar.selectbox(
-        "Select a saved prompt:", ["Current Baseline"] + saved_prompts, index=0
+        "Select a saved prompt:",
+        prompt_list,
+        index=prompt_list.index(st.session_state.last_selected_prompt),
+        key="prompt_selector",
+        on_change=on_prompt_change,
     )
 
+    # If it's the first time or if we haven't loaded the prompt yet, load it now
+    if "modified_prompt" not in st.session_state:
+        load_selected_prompt(selected_prompt)
+
+    return st.session_state.modified_prompt
+
+
+def load_selected_prompt(selected_prompt: str) -> None:
+    """
+    Load the selected prompt and update the session state.
+
+    Args:
+        selected_prompt (str): The name of the selected prompt file.
+    """
     if selected_prompt == "Current Baseline":
-        return BASELINE_PROMPT
+        loaded_prompt = BASELINE_PROMPT
     else:
         try:
             with open(os.path.join(PROMPTS_DIR, selected_prompt), "r") as f:
-                return f.read()
+                loaded_prompt = f.read()
         except FileNotFoundError:
             logger.error(f"Selected prompt file {selected_prompt} not found.")
             st.sidebar.error(
                 f"Selected prompt file {selected_prompt} not found. Using default prompt."
             )
-            return BASELINE_PROMPT
+            loaded_prompt = BASELINE_PROMPT
+
+    # Update the session state with the newly loaded prompt
+    st.session_state.modified_prompt = loaded_prompt
 
 
 def display_prompt_dev_box(baseline_prompt: str, df: pd.DataFrame) -> Tuple[str, str]:
