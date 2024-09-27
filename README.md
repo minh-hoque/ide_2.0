@@ -64,12 +64,13 @@ The workflow is designed to scale SME expertise and allow data scientists to qui
   - `extraction_prompts.py`: Default prompts for the entity extraction system
   - `auto_evaluation_prompts.py`: Prompts for auto-evaluation
 - `storage/`:
-  - `manual_annotations/`: Directory for storing manually annotated responses
-  - `iteration_responses/`: Directory for storing responses from Q&A iteration
+  - `qna_data/`: Directory for storing Q&A datasets
+  - `qna_responses/`: Directory for storing responses from Q&A iteration
+  - `qna_prompts/`: Directory for storing saved prompts for Q&A
   - `extraction_data/`: Directory for storing entity extraction datasets
   - `extraction_results/`: Directory for storing entity extraction results
-  - `prompts/`: Directory for storing saved prompts
   - `extraction_prompts/`: Directory for storing saved extraction prompts
+  - `auto_evaluation_research/`: Directory for storing auto-evaluation research data
 
 ## Running the Application
 
@@ -186,9 +187,9 @@ For the **Extraction Prompt Iteration** page, your entity extraction dataset CSV
 
 ### LLM Interaction (`helper/llms.py`)
 
-- `query_gpt4`: Function to query GPT-4 models with various parameters.
+- `query_llm`: Function to query GPT-4 models with various parameters.
 - `query_structured_gpt4`: Function to query GPT-4 and parse responses into structured format.
-- `auto_evaluate_responses`: Function to automatically evaluate new responses against old ones or SME feedback.
+- `auto_evaluate_responses`: Function to automatically evaluate new responses against GT responses or SME feedback.
 
 ### Logging (`helper/logging.py`)
 

@@ -144,21 +144,21 @@ def auto_evaluate_batch(batch: List[Dict[str, Any]]) -> List[tuple]:
         logger.debug(f"Processing row with index {row['index']}")
         formatted_prompt = ""
         if row.get("rating") == "ACCEPT":
-            formatted_prompt = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT.format(
+            formatted_prompt = AUTO_EVAL_EQUIVALENCE_PROMPT.format(
                 old_response=row["response"],
                 new_response=row["new_response"],
                 question=row["question"],
             )
             logger.debug("Using ACCEPT prompt")
         elif row.get("edited_gt"):
-            formatted_prompt = LLM_AS_A_JUDGE_EQUIVALENCE_PROMPT.format(
+            formatted_prompt = AUTO_EVAL_EQUIVALENCE_PROMPT.format(
                 old_response=row["edited_gt"],
                 new_response=row["new_response"],
                 question=row["question"],
             )
             logger.debug("Using edited_gt prompt")
         elif row.get("sme_feedback"):
-            formatted_prompt = LLM_AS_A_JUDGE_SME_FEEDBACK_PROMPT.format(
+            formatted_prompt = AUTO_EVAL_SME_FEEDBACK_PROMPT.format(
                 old_response=row["response"],
                 sme_feedback=row["sme_feedback"],
                 new_response=row["new_response"],
